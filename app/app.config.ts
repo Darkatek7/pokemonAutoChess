@@ -107,15 +107,15 @@ export default config({
           directives: {
             defaultSrc: [
               "'self'",
-              "https://*.pokemon-auto-chess.com",
-              "wss://*.pokemon-auto-chess.com",
+              "https://*.darkatek7.com",
+              "wss://*.darkatek7.com",
               "https://*.firebaseapp.com",
               "https://apis.google.com",
               "https://*.googleapis.com",
               "https://*.githubusercontent.com",
               "http://raw.githubusercontent.com",
               "https://*.youtube.com",
-              "https://pokemon.darkatek7.com",
+              "https://pokemon-auto-chess.com",
               "https://eternara.site",
               "https://www.penumbra-autochess.com",
               "https://pokechess.com.br",
