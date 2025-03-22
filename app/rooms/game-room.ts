@@ -118,6 +118,8 @@ export default class GameRoom extends Room<GameState> {
   }) {
     logger.info("Create Game ", this.roomId)
 
+    this.setSeatReservationTime(10);
+
     this.presence.subscribe("room-deleted", (roomId) => {
       if (this.roomId === roomId) {
         this.disconnect(CloseCodes.ROOM_DELETED)
