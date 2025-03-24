@@ -107,6 +107,8 @@ export default config({
           directives: {
             defaultSrc: [
               "'self'",
+              "'unsafe-inline'",
+              "'unsafe-eval'",
               "https://*.darkatek7.com",
               "wss://*.darkatek7.com",
               "https://pokemon.darkatek7.com",
