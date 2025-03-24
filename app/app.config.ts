@@ -109,6 +109,8 @@ export default config({
               "'self'",
               "https://*.darkatek7.com",
               "wss://*.darkatek7.com",
+              "https://*.cloudflareinsights.com",
+              "https://*.cloudflareinsights.com*",
               "https://*.firebaseapp.com",
               "https://apis.google.com",
               "https://*.googleapis.com",
