@@ -133,7 +133,8 @@ export default config({
               "'unsafe-inline'",
               "'unsafe-eval'",
               "https://apis.google.com",
-              "https://*.googleapis.com"
+              "https://*.googleapis.com",
+              "https://static.cloudflareinsights.com"
             ],
             imgSrc: [
               "'self'",
