@@ -116,6 +116,7 @@ export default config({
               "http://raw.githubusercontent.com",
               "https://*.youtube.com",
               "https://pokemon.darkatek7.com",
+              "wss://pokemon.darkatek7.com",
               "https://eternara.site",
               "https://www.penumbra-autochess.com",
               "https://pokechess.com.br",
