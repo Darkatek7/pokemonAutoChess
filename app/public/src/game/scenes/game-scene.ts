@@ -25,7 +25,6 @@ import { throttle } from "../../../../utils/function"
 import { logger } from "../../../../utils/logger"
 import { values } from "../../../../utils/schemas"
 import { clearTitleNotificationIcon } from "../../../../utils/window"
-import { getGameContainer } from "../../pages/game"
 import { SOUNDS, playMusic, playSound } from "../../pages/utils/audio"
 import { transformCoordinate } from "../../pages/utils/utils"
 import { preference } from "../../preferences"
@@ -41,6 +40,7 @@ import { SellZone } from "../components/sell-zone"
 import UnownManager from "../components/unown-manager"
 import WeatherManager from "../components/weather-manager"
 import { DEPTH } from "../depths"
+import { clamp } from "../../../../utils/number"
 
 export default class GameScene extends Scene {
   tilemaps: Map<DungeonPMDO, DesignTiled> = new Map<DungeonPMDO, DesignTiled>()
@@ -106,6 +106,7 @@ export default class GameScene extends Scene {
   startGame() {
     if (this.uid && this.room) {
       this.registerKeys()
+      this.setupCamera()
       this.input.dragDistanceThreshold = 1
 
       const playerUids = values(this.room.state.players).map((p) => p.id)
@@ -174,6 +175,37 @@ export default class GameScene extends Scene {
     ) {
       this.minigameManager.update()
     }
+  }
+
+  setupCamera() {
+    this.cameras.main.setBounds(
+      0,
+      0,
+      (this.map?.widthInPixels ?? 1200) * 2,
+      (this.map?.heightInPixels ?? 768) * 2
+    )
+
+    this.input.on("wheel", (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
+      this.cameras.main.zoom = clamp(
+        this.cameras.main.zoom - Math.sign(deltaY) * 0.1,
+        1,
+        2
+      )
+      //this.cameras.main.centerOn(pointer.worldX, pointer.worldY)
+      if (deltaY < 0) {
+        this.cameras.main.pan(pointer.worldX, pointer.worldY, 400, "Power2")
+      } else if (this.cameras.main.zoom === 1) {
+        this.cameras.main.pan(0, 0, 400, "Power2")
+      }
+    })
+
+    this.input.on("pointermove", (pointer) => {
+      if (!pointer.isDown || this.itemDragged || this.pokemonDragged) return
+      const cam = this.cameras.main
+      if (cam.zoom === 1) return
+      cam.scrollX -= (pointer.x - pointer.prevPosition.x) / cam.zoom
+      cam.scrollY -= (pointer.y - pointer.prevPosition.y) / cam.zoom
+    })
   }
 
   registerKeys() {
@@ -313,6 +345,7 @@ export default class GameScene extends Scene {
         layer.name,
         mapName + "/" + layer.name
       )!
+      tileset.image?.setFilter(Phaser.Textures.FilterMode.NEAREST)
       map.createLayer(layer.name, tileset, 0, 0)?.setScale(2, 2)
     })
     const sys = this.sys as any
@@ -371,12 +404,16 @@ export default class GameScene extends Scene {
         this.room?.state.phase === GamePhaseState.TOWN &&
         !this.spectate
       ) {
-        const vector = this.minigameManager.getVector(pointer.x, pointer.y)
+        // compute actual x/y coordinates after taking into account camera scroll and zoom
+        const camera = this.cameras.main
+        const x = camera.worldView.left + pointer.x / camera.zoom
+        const y = camera.worldView.top + pointer.y / camera.zoom
+        const vector = this.minigameManager.getVector(x, y)
         this.room?.send(Transfer.VECTOR, vector)
 
         const clickAnimation = this.add.sprite(
-          pointer.x,
-          pointer.y,
+          x,
+          y,
           "attacks",
           `WATER/cell/000.png`
         )
@@ -384,8 +421,8 @@ export default class GameScene extends Scene {
         clickAnimation.anims.play("WATER/cell")
         this.tweens.add({
           targets: clickAnimation,
-          x: pointer.x,
-          y: pointer.y,
+          x,
+          y,
           ease: "linear",
           yoyo: true,
           duration: 200,
@@ -565,7 +602,7 @@ export default class GameScene extends Scene {
           }
           // RETURN TO ORIGINAL SPOT
           else {
-            const player = getGameContainer().player
+            const player = this.room?.state.players.get(this.uid!)
             if (player) this.itemsContainer?.render(player.items)
           }
           this.itemDragged = null
@@ -581,6 +618,8 @@ export default class GameScene extends Scene {
         gameObject.x = gameObject.input.dragStartX
         gameObject.y = gameObject.input.dragStartY
       }
+      this.pokemonDragged = null
+      this.itemDragged = null
     })
 
     this.input.on(

@@ -586,6 +586,7 @@ export enum Pkm {
   PIDGEOT = "PIDGEOT",
   PIDGEOTTO = "PIDGEOTTO",
   PIDGEY = "PIDGEY",
+  PIDOVE = "PIDOVE",
   PIGNITE = "PIGNITE",
   PIKACHU = "PIKACHU",
   //PIKIPEK = "PIKIPEK",
@@ -801,6 +802,7 @@ export enum Pkm {
   TOXEL = "TOXEL",
   TOXICROAK = "TOXICROAK",
   TOXTRICITY = "TOXTRICITY",
+  TRANQUILL = "TRANQUILL",
   TRAPINCH = "TRAPINCH",
   TREECKO = "TREECKO",
   TREVENANT = "TREVENANT",
@@ -819,6 +821,7 @@ export enum Pkm {
   TYRUNT = "TYRUNT",
   ULTRA_NECROZMA = "ULTRA_NECROZMA",
   UMBREON = "UMBREON",
+  UNFEZANT = "UNFEZANT",
   UNOWN_A = "UNOWN_A",
   UNOWN_B = "UNOWN_B",
   UNOWN_C = "UNOWN_C",
@@ -929,7 +932,21 @@ export enum Pkm {
   ALCREMIE_SALTED = "ALCREMIE_SALTED",
   ALCREMIE_RUBY_SWIRL = "ALCREMIE_RUBY_SWIRL",
   ALCREMIE_CARAMEL_SWIRL = "ALCREMIE_CARAMEL_SWIRL",
-  ALCREMIE_RAINBOW_SWIRL = "ALCREMIE_RAINBOW_SWIRL"
+  ALCREMIE_RAINBOW_SWIRL = "ALCREMIE_RAINBOW_SWIRL",
+  DURALUDON = "DURALUDON",
+  ARCHALUDON = "ARCHALUDON",
+  SPRIGATITO = "SPRIGATITO",
+  FLORAGATO = "FLORAGATO",
+  MEOWSCARADA = "MEOWSCARADA",
+  FOMANTIS = "FOMANTIS",
+  LURANTIS = "LURANTIS",
+  ROARING_MOON = "ROARING_MOON",
+  CHARCADET = "CHARCADET",
+  ARMAROUGE = "ARMAROUGE",
+  CERULEDGE = "CERULEDGE",
+  TYNAMO = "TYNAMO",
+  EELEKTRIK = "EELEKTRIK",
+  EELEKTROSS = "EELEKTROSS"
 }
 
 export const PkmIndex: { [key in Pkm]: string } = {
@@ -938,7 +955,6 @@ export const PkmIndex: { [key in Pkm]: string } = {
   [Pkm.SUBSTITUTE]: "0000-0001",
 
   // Gen 1
-
   [Pkm.BULBASAUR]: "0001",
   [Pkm.IVYSAUR]: "0002",
   [Pkm.VENUSAUR]: "0003",
@@ -1410,7 +1426,6 @@ export const PkmIndex: { [key in Pkm]: string } = {
   [Pkm.DEOXYS_SPEED]: "0386-0003",
 
   // Gen 4
-
   [Pkm.TURTWIG]: "0387",
   [Pkm.GROTLE]: "0388",
   [Pkm.TORTERRA]: "0389",
@@ -1532,7 +1547,6 @@ export const PkmIndex: { [key in Pkm]: string } = {
   [Pkm.ARCEUS]: "0493",
 
   // Gen 5
-
   [Pkm.VICTINI]: "0494",
   [Pkm.SNIVY]: "0495",
   [Pkm.SERVINE]: "0496",
@@ -1558,9 +1572,9 @@ export const PkmIndex: { [key in Pkm]: string } = {
   //[Pkm.SIMIPOUR]: "0516",
   [Pkm.MUNNA]: "0517",
   [Pkm.MUSHARNA]: "0518",
-  //[Pkm.PIDOVE]: "0519",
-  //[Pkm.TRANQUILL]: "0520",
-  //[Pkm.UNFEZANT]: "0521",
+  [Pkm.PIDOVE]: "0519",
+  [Pkm.TRANQUILL]: "0520",
+  [Pkm.UNFEZANT]: "0521",
   //[Pkm.BLITZLE]: "0522",
   //[Pkm.ZEBSTRIKA]: "0523",
   //[Pkm.ROGGENROLA]: "0524",
@@ -1647,9 +1661,9 @@ export const PkmIndex: { [key in Pkm]: string } = {
   //[Pkm.KLINK]: "0599",
   //[Pkm.KLANG]: "0600",
   //[Pkm.KLINKLANG]: "0601",
-  //[Pkm.TYNAMO]: "0602",
-  //[Pkm.EELEKTRIK]: "0603",
-  //[Pkm.EELEKTROSS]: "0604",
+  [Pkm.TYNAMO]: "0602",
+  [Pkm.EELEKTRIK]: "0603",
+  [Pkm.EELEKTROSS]: "0604",
   [Pkm.ELGYEM]: "0605",
   [Pkm.BEHEEYEM]: "0606",
   [Pkm.LITWICK]: "0607",
@@ -1697,7 +1711,6 @@ export const PkmIndex: { [key in Pkm]: string } = {
   [Pkm.GENESECT]: "0649",
 
   // Gen 6
-
   //[Pkm.CHESTPIN]: "0650",
   //[Pkm.QUILLADIN]: "0651",
   //[Pkm.CHESNAUGHT]: "0652",
@@ -1810,8 +1823,8 @@ export const PkmIndex: { [key in Pkm]: string } = {
   //[Pkm.MUDSDALE]: "0750",
   [Pkm.DEWPIDER]: "0751",
   [Pkm.ARAQUANID]: "0752",
-  //[Pkm.FOMANTIS]: "0753",
-  //[Pkm.LURANTIS]: "0754",
+  [Pkm.FOMANTIS]: "0753",
+  [Pkm.LURANTIS]: "0754",
   //[Pkm.MORELULL]: "0755",
   //[Pkm.SHIINOTIC]: "0756",
   [Pkm.SALANDIT]: "0757",
@@ -1875,7 +1888,6 @@ export const PkmIndex: { [key in Pkm]: string } = {
   [Pkm.MELMETAL]: "0809",
 
   // Gen 8
-
   //[Pkm.GROOKEY]: "0810",
   //[Pkm.THWACKEY]: "0811",
   //[Pkm.RILLABOOM]: "0812",
@@ -1959,7 +1971,7 @@ export const PkmIndex: { [key in Pkm]: string } = {
   [Pkm.ARCTOZOLT]: "0881",
   [Pkm.DRACOVISH]: "0882",
   [Pkm.ARCTOVISH]: "0883",
-  //[Pkm.DURALUDON]: "0884",
+  [Pkm.DURALUDON]: "0884",
   [Pkm.DREEPY]: "0885",
   [Pkm.DRAKLOAK]: "0886",
   [Pkm.DRAGAPULT]: "0887",
@@ -1990,10 +2002,9 @@ export const PkmIndex: { [key in Pkm]: string } = {
   [Pkm.ENAMORUS]: "0905",
 
   // Gen 9
-
-  //[Pkm.SPRIGATITO]: "0906",
-  //[Pkm.FLORAGATO]: "0907",
-  //[Pkm.MEOWSCARADA]: "0908",
+  [Pkm.SPRIGATITO]: "0906",
+  [Pkm.FLORAGATO]: "0907",
+  [Pkm.MEOWSCARADA]: "0908",
   [Pkm.FUECOCO]: "0909",
   [Pkm.CROCALOR]: "0910",
   [Pkm.SKELEDIRGE]: "0911",
@@ -2021,9 +2032,9 @@ export const PkmIndex: { [key in Pkm]: string } = {
   [Pkm.NACLI]: "0932",
   [Pkm.NACLSTACK]: "0933",
   [Pkm.GARGANACL]: "0934",
-  //[Pkm.CHARCADET]: "0935",
-  //[Pkm.ARMAROUGE]: "0936",
-  //[Pkm.CERULEDGE]: "0937",
+  [Pkm.CHARCADET]: "0935",
+  [Pkm.ARMAROUGE]: "0936",
+  [Pkm.CERULEDGE]: "0937",
   //[Pkm.TABDULB]: "0938",
   //[Pkm.BELLIBOLT]: "0939",
   [Pkm.WATTREL]: "0940",
@@ -2088,6 +2099,7 @@ export const PkmIndex: { [key in Pkm]: string } = {
   [Pkm.BAXCALIBUR]: "0998",
   [Pkm.GIMMIGHOUL]: "0999-0001",
   [Pkm.GHOLDENGO]: "1000",
+  [Pkm.ROARING_MOON]: "1005",
   [Pkm.DIPPLIN]: "1011",
   [Pkm.OGERPON_TEAL]: "1017",
   [Pkm.OGERPON_WELLSPRING]: "1017-0001",
@@ -2097,6 +2109,7 @@ export const PkmIndex: { [key in Pkm]: string } = {
   [Pkm.OGERPON_WELLSPRING_MASK]: "1017-0005",
   [Pkm.OGERPON_HEARTHFLAME_MASK]: "1017-0006",
   [Pkm.OGERPON_CORNERSTONE_MASK]: "1017-0007",
+  [Pkm.ARCHALUDON]: "1018",
   [Pkm.HYDRAPPLE]: "1019",
   [Pkm.PECHARUNT]: "1025"
 }
@@ -2979,8 +2992,8 @@ export const PkmFamily: { [key in Pkm]: Pkm } = {
   [Pkm.SIZZLIPEDE]: Pkm.SIZZLIPEDE,
   [Pkm.CENTISKORCH]: Pkm.SIZZLIPEDE,
   [Pkm.ZYGARDE_10]: Pkm.ZYGARDE_10,
-  [Pkm.ZYGARDE_50]: Pkm.ZYGARDE_50,
-  [Pkm.ZYGARDE_100]: Pkm.ZYGARDE_100,
+  [Pkm.ZYGARDE_50]: Pkm.ZYGARDE_10,
+  [Pkm.ZYGARDE_100]: Pkm.ZYGARDE_10,
   [Pkm.STUFFUL]: Pkm.STUFFUL,
   [Pkm.BEWEAR]: Pkm.STUFFUL,
   [Pkm.GLIMMET]: Pkm.GLIMMET,
@@ -3034,7 +3047,24 @@ export const PkmFamily: { [key in Pkm]: Pkm } = {
   [Pkm.ALCREMIE_CARAMEL_SWIRL]: Pkm.MILCERY,
   [Pkm.ALCREMIE_RAINBOW_SWIRL]: Pkm.MILCERY,
   [Pkm.PECHARUNT]: Pkm.PECHARUNT,
-  [Pkm.VELUZA]: Pkm.VELUZA
+  [Pkm.VELUZA]: Pkm.VELUZA,
+  [Pkm.DURALUDON]: Pkm.DURALUDON,
+  [Pkm.ARCHALUDON]: Pkm.DURALUDON,
+  [Pkm.SPRIGATITO]: Pkm.SPRIGATITO,
+  [Pkm.FLORAGATO]: Pkm.SPRIGATITO,
+  [Pkm.MEOWSCARADA]: Pkm.SPRIGATITO,
+  [Pkm.FOMANTIS]: Pkm.FOMANTIS,
+  [Pkm.LURANTIS]: Pkm.FOMANTIS,
+  [Pkm.ROARING_MOON]: Pkm.ROARING_MOON,
+  [Pkm.CHARCADET]: Pkm.CHARCADET,
+  [Pkm.ARMAROUGE]: Pkm.CHARCADET,
+  [Pkm.CERULEDGE]: Pkm.CHARCADET,
+  [Pkm.TYNAMO]: Pkm.TYNAMO,
+  [Pkm.EELEKTRIK]: Pkm.TYNAMO,
+  [Pkm.EELEKTROSS]: Pkm.TYNAMO,
+  [Pkm.PIDOVE]: Pkm.PIDOVE,
+  [Pkm.TRANQUILL]: Pkm.PIDOVE,
+  [Pkm.UNFEZANT]: Pkm.PIDOVE
 }
 
 export const PkmRegionalVariants: { [key in Pkm]?: readonly Pkm[] } = {
@@ -3294,9 +3324,9 @@ export const AnimationConfig: {
     eat: AnimationType.Sleep
   },
   [Pkm.GOLBAT]: {
-    attack: AnimationType.Shoot,
-    ability: AnimationType.Attack,
-    emote: AnimationType.Charge
+    attack: AnimationType.Attack,
+    ability: AnimationType.Charge,
+    emote: AnimationType.Hover
   },
   [Pkm.CROBAT]: {
     attack: AnimationType.Shoot,
@@ -3529,18 +3559,18 @@ export const AnimationConfig: {
     emote: AnimationType.Shoot
   },
   [Pkm.TURTWIG]: {
-    attack: AnimationType.Shoot,
-    ability: AnimationType.Hop,
+    attack: AnimationType.Attack,
+    ability: AnimationType.Rumble,
     emote: AnimationType.Shoot
   },
   [Pkm.GROTLE]: {
-    attack: AnimationType.Shoot,
-    ability: AnimationType.Hop,
+    attack: AnimationType.Attack,
+    ability: AnimationType.Rumble,
     emote: AnimationType.Shoot
   },
   [Pkm.TORTERRA]: {
-    attack: AnimationType.Shoot,
-    ability: AnimationType.Hop,
+    attack: AnimationType.Attack,
+    ability: AnimationType.Rumble,
     emote: AnimationType.Shoot
   },
   [Pkm.CHIMCHAR]: {
@@ -5093,7 +5123,7 @@ export const AnimationConfig: {
   },
   [Pkm.ETERNATUS]: {
     attack: AnimationType.Attack,
-    ability: AnimationType.Charge,
+    ability: AnimationType.Shoot,
     emote: AnimationType.Charge
   },
   [Pkm.PONYTA]: {
@@ -7881,6 +7911,94 @@ export const AnimationConfig: {
   [Pkm.VELUZA]: {
     attack: AnimationType.Attack,
     ability: AnimationType.Charge,
+    emote: AnimationType.Shoot
+  },
+  [Pkm.DURALUDON]: {
+    attack: AnimationType.Attack,
+    ability: AnimationType.Shoot,
+    emote: AnimationType.Charge
+  },
+  [Pkm.ARCHALUDON]: {
+    attack: AnimationType.Attack,
+    ability: AnimationType.Shoot,
+    emote: AnimationType.Charge
+  },
+  [Pkm.SPRIGATITO]: {
+    attack: AnimationType.Attack,
+    ability: AnimationType.Shoot,
+    emote: AnimationType.Appeal
+  },
+  [Pkm.FLORAGATO]: {
+    attack: AnimationType.Attack,
+    ability: AnimationType.SpAttack,
+    emote: AnimationType.Charge
+  },
+  [Pkm.MEOWSCARADA]: {
+    attack: AnimationType.Strike,
+    ability: AnimationType.Shoot,
+    emote: AnimationType.Charge
+  },
+  [Pkm.FOMANTIS]: {
+    attack: AnimationType.Attack,
+    ability: AnimationType.Shoot,
+    emote: AnimationType.Charge
+  },
+  [Pkm.LURANTIS]: {
+    attack: AnimationType.MultiScratch,
+    ability: AnimationType.Attack,
+    emote: AnimationType.Charge
+  },
+  [Pkm.ROARING_MOON]: {
+    attack: AnimationType.Attack,
+    ability: AnimationType.RearUp,
+    emote: AnimationType.RearUp,
+    shinyUnavailable: true
+  },
+  [Pkm.CHARCADET]: {
+    attack: AnimationType.Strike,
+    ability: AnimationType.Shoot,
+    emote: AnimationType.Charge
+  },
+  [Pkm.ARMAROUGE]: {
+    attack: AnimationType.Strike,
+    ability: AnimationType.Shoot,
+    emote: AnimationType.Charge
+  },
+  [Pkm.CERULEDGE]: {
+    attack: AnimationType.Strike,
+    ability: AnimationType.Shoot,
+    emote: AnimationType.Charge
+  },
+  [Pkm.TYNAMO]: {
+    attack: AnimationType.Attack,
+    ability: AnimationType.Shoot,
+    emote: AnimationType.Charge,
+    shinyUnavailable: true
+  },
+  [Pkm.EELEKTRIK]: {
+    attack: AnimationType.Attack,
+    ability: AnimationType.Shoot,
+    emote: AnimationType.Charge
+  },
+  [Pkm.EELEKTROSS]: {
+    attack: AnimationType.Attack,
+    ability: AnimationType.Shoot,
+    emote: AnimationType.Charge
+  },
+  [Pkm.PIDOVE]: {
+    attack: AnimationType.Attack,
+    ability: AnimationType.Shoot,
+    emote: AnimationType.Shoot
+  },
+  [Pkm.TRANQUILL]: {
+    attack: AnimationType.Attack,
+    ability: AnimationType.Hover,
+    emote: AnimationType.Shoot,
+    shinyUnavailable: true
+  },
+  [Pkm.UNFEZANT]: {
+    attack: AnimationType.Attack,
+    ability: AnimationType.Hover,
     emote: AnimationType.Shoot
   }
 }

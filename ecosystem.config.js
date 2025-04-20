@@ -10,11 +10,10 @@ module.exports = {
     watch: false,
     time: true,
     wait_ready: true,
-    max_memory_restart: "1300M",
     env_production: {
       NODE_ENV: "production"
     },
-    interpreter: "node@22.13.1",
+    interpreter: "node@22.14.0",
   }],
   deploy: {
     production: {
@@ -23,7 +22,7 @@ module.exports = {
       "ref": "origin/prod",
       "repo": "https://github.com/keldaanCommunity/pokemonAutoChess.git",
       "path": "/home/deploy",
-      "post-deploy": "npm run build"
+      "post-deploy": "source ~/.nvm/nvm.sh && nvm use 22.14.0 && npm install && nvm use 20.12.0 && npm run assetpack && nvm use 22.14.0 && npm run build"
     }
   }
 }

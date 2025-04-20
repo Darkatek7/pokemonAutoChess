@@ -30,7 +30,7 @@ The iconic place of the Mystery Dungeon series is now in Pokemon Auto Chess ! Pl
 
 ## Let me cook !
 
-The 31th synergy is here: ![Gourmet](https://raw.githubusercontent.com/keldaanCommunity/pokemonAutoChess/master/app/public/src/assets/types/GOURMET.svg) **Gourmet**
+The 31st synergy is here: ![Gourmet](https://raw.githubusercontent.com/keldaanCommunity/pokemonAutoChess/master/app/public/src/assets/types/GOURMET.svg) **Gourmet**
 These cooking enthusiasts will provide your team with some delicious meals that will boost their power for the next round. Choose your Chef and enjoy the feast !
 
 ## Statistics rework
@@ -38,5 +38,7 @@ These cooking enthusiasts will provide your team with some delicious meals that 
 Attack speed, move speed and ability cooldown have all been merged into a single stat: Speed. Every Pokemon now has a different base speed, taken from the main series games. Use that information wisely for your item builds !
 
 Also, defense and special defense numbers have all been doubled, with the damage reduction formula adjusted so that it doesn't have any impact but allow finer tweaks to the def/spedef numbers of each Pokemon and effect in the game.
+
+---
 
 Check out the full changelog on [Discord](https://discord.com/channels/737230355039387749/737230355039387752) !

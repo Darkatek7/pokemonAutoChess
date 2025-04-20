@@ -1,7 +1,7 @@
 import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema"
 import { carryOverPermanentStats } from "../../core/evolution-rules"
 import { PokemonEntity } from "../../core/pokemon-entity"
-import { getUnitPowerScore } from "../../public/src/pages/component/bot-builder/bot-logic"
+import { getUnitPowerScore } from "../../core/bot-logic"
 import type GameState from "../../rooms/states/game-state"
 import type { IPlayer, Role, Title } from "../../types"
 import { SynergyTriggers, UniquePool } from "../../types/Config"
@@ -401,6 +401,9 @@ export default class Player extends Schema implements IPlayer {
                 ) {
                   this.transformPokemon(pokemon, Pkm.TYPE_NULL)
                 }
+                if (pokemon.name === Pkm.ARCHALUDON) {
+                  this.transformPokemon(pokemon, Pkm.DURALUDON)
+                }
                 if (!isOnBench(pokemon)) {
                   needsRecomputingSynergiesAgain = true
                 }
@@ -659,8 +662,11 @@ function spawnDIAYAvatar(player: Player): Pokemon {
       player.money = 1
     }
   }
-  if (avatar.rarity === Rarity.HATCH || avatar.rarity === Rarity.SPECIAL) {
-    powerScore += 5
+  if (avatar.rarity === Rarity.HATCH) {
+    powerScore = [5, 6, 7][avatar.stars] ?? 7
+  }
+  if (avatar.rarity === Rarity.SPECIAL) {
+    powerScore = [1, 3, 7, 7][avatar.stars] ?? 7
   }
   if (powerScore < 5) {
     player.money += 55 - Math.round(10 * powerScore)

@@ -168,14 +168,14 @@ export class DebugScene extends Phaser.Scene {
               "/assets/tilesets/" + mapName + "/" + t.image
             )
           })
-          this.load.tilemapTiledJSON("map", tilemap)
+          this.load.tilemapTiledJSON(mapName, tilemap)
           preloadMusic(this, DungeonDetails[mapName].music)
           this.load.once("complete", resolve)
           this.load.start()
         })
       })
       .then(() => {
-        const map = this.make.tilemap({ key: "map" })
+        const map = this.make.tilemap({ key: mapName })
         this.map = map
         this.tilemap!.layers.forEach((layer) => {
           const tileset = map.addTilesetImage(
@@ -306,7 +306,7 @@ export class DebugScene extends Phaser.Scene {
       if (status == Status.BLINDED) {
         this.pokemon.addBlinded()
       }
-      if (status == Status.SPIKE_ARMOR) {
+      if (status == Status.SPIKY_SHIELD) {
         this.pokemon.addSpikeArmor()
       }
       if (status == Status.MAGIC_BOUNCE) {

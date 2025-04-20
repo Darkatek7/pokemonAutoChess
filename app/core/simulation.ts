@@ -227,10 +227,10 @@ export default class Simulation extends Schema implements ISimulation {
     x: number,
     y: number,
     team: Team,
-    isClone = false
+    isSpawn = false
   ) {
     const pokemonEntity = new PokemonEntity(pokemon, x, y, team, this)
-    pokemonEntity.isClone = isClone
+    pokemonEntity.isSpawn = isSpawn
     this.applySynergyEffects(pokemonEntity)
     this.applyItemsEffects(pokemonEntity)
     if (pokemon.meal) {
@@ -620,7 +620,10 @@ export default class Simulation extends Schema implements ISimulation {
     for (const team of [this.blueTeam, this.redTeam]) {
       const dragonLevel = values(team).reduce(
         (acc, pokemon) =>
-          acc + (pokemon.types.has(Synergy.DRAGON) ? pokemon.stars : 0),
+          acc +
+          (pokemon.types.has(Synergy.DRAGON) && !pokemon.isSpawn
+            ? pokemon.stars
+            : 0),
         0
       )
       team.forEach((pokemon) => {
@@ -845,7 +848,7 @@ export default class Simulation extends Schema implements ISimulation {
       case Effect.ASSURANCE:
         if (types.has(Synergy.DARK)) {
           pokemon.addCritChance(40, pokemon, 0, false)
-          pokemon.addCritPower(40, pokemon, 0, false)
+          pokemon.addCritPower(60, pokemon, 0, false)
           pokemon.effects.add(Effect.ASSURANCE)
         }
         break
@@ -853,7 +856,7 @@ export default class Simulation extends Schema implements ISimulation {
       case Effect.BEAT_UP:
         if (types.has(Synergy.DARK)) {
           pokemon.addCritChance(50, pokemon, 0, false)
-          pokemon.addCritPower(50, pokemon, 0, false)
+          pokemon.addCritPower(100, pokemon, 0, false)
           pokemon.effects.add(Effect.BEAT_UP)
         }
         break

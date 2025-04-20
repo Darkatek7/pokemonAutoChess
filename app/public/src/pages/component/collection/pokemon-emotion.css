@@ -9,6 +9,7 @@
 .pokemon-emotion > img {
   width: 80px;
   height: 80px;
+  image-rendering: pixelated;
   border-radius: 8px 8px 0 0;
 }
 
@@ -36,6 +37,7 @@
   word-break: break-word;
   font-weight: 500;
   font-size: 90%;
+  text-align: center;
 }
 
 .pokemon-emotion .shortcut {
@@ -56,5 +58,6 @@
 .pokemon-emotion p > img {
   width: 20px;
   height: 20px;
+  image-rendering: pixelated;
   margin-left: 0.5em;
 }

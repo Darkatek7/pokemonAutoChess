@@ -1,5 +1,5 @@
 import { SetSchema } from "@colyseus/schema"
-import Phaser, { GameObjects } from "phaser"
+import Phaser, { GameObjects, Geom } from "phaser"
 import type MoveTo from "phaser3-rex-plugins/plugins/moveto"
 import type MoveToPlugin from "phaser3-rex-plugins/plugins/moveto-plugin"
 import PokemonFactory from "../../../../models/pokemon-factory"
@@ -9,8 +9,7 @@ import {
   AttackSpriteScale,
   type Emotion,
   type IPokemon,
-  type IPokemonEntity,
-  instanceofPokemonEntity
+  type IPokemonEntity
 } from "../../../../types"
 import {
   DEFAULT_CRIT_CHANCE,
@@ -24,7 +23,7 @@ import {
   PokemonTint,
   type Rarity,
   SpriteType,
-  type Team
+  Team
 } from "../../../../types/enum/Game"
 import { Item } from "../../../../types/enum/Item"
 import type { Passive } from "../../../../types/enum/Passive"
@@ -147,9 +146,7 @@ export default class PokemonSprite extends DraggableObject {
     this.shouldShowTooltip = true
     this.stars = pokemon.stars
     this.stages = getPokemonData(pokemon.name).stages
-    this.evolution = instanceofPokemonEntity(pokemon)
-      ? Pkm.DEFAULT
-      : (pokemon as IPokemon).evolution
+    this.evolution = inBattle ? Pkm.DEFAULT : (pokemon as IPokemon).evolution
     this.emotion = pokemon.emotion
     this.shiny = pokemon.shiny
     this.height = 0
@@ -191,10 +188,15 @@ export default class PokemonSprite extends DraggableObject {
 
     this.lazyloadAnimations(scene)
 
-    const p = <IPokemonEntity>pokemon
-    if (p.orientation) {
-      this.orientation = p.orientation
-      this.action = p.action
+    const isEntity = (
+      pokemon: IPokemon | IPokemonEntity
+    ): pokemon is IPokemonEntity => {
+      return inBattle
+    }
+
+    if (isEntity(pokemon)) {
+      this.orientation = pokemon.orientation
+      this.action = pokemon.action
     } else {
       this.orientation = Orientation.DOWNLEFT
       this.action = PokemonActionState.IDLE
@@ -220,7 +222,7 @@ export default class PokemonSprite extends DraggableObject {
     this.width = this.sprite.width
     this.itemsContainer = new ItemsContainer(
       scene,
-      p.items ?? new SetSchema(),
+      pokemon.items ?? new SetSchema(),
       this.width / 2 + 25,
       -35,
       this.id,
@@ -234,20 +236,20 @@ export default class PokemonSprite extends DraggableObject {
     }
     this.add(this.sprite)
 
-    if (instanceofPokemonEntity(pokemon)) {
-      if (p.status.light) {
+    if (isEntity(pokemon)) {
+      if (pokemon.status.light) {
         this.addLight()
       }
-      if (p.status.electricField) {
+      if (pokemon.status.electricField) {
         this.addElectricField()
       }
-      if (p.status.psychicField) {
+      if (pokemon.status.psychicField) {
         this.addPsychicField()
       }
-      if (p.status.grassField) {
+      if (pokemon.status.grassField) {
         this.addGrassField()
       }
-      if (p.status.fairyField) {
+      if (pokemon.status.fairyField) {
         this.addFairyField()
       }
     } else {
@@ -257,9 +259,9 @@ export default class PokemonSprite extends DraggableObject {
     }
     this.add(this.itemsContainer)
 
-    if (instanceofPokemonEntity(pokemon)) {
-      this.setLifeBar(p, scene)
-      if (pokemon.maxPP > 0) this.setPowerBar(p, scene)
+    if (isEntity(pokemon)) {
+      this.setLifeBar(pokemon, scene)
+      if (pokemon.maxPP > 0) this.setPowerBar(pokemon, scene)
       //this.setEffects(p, scene);
     } else {
       if (pokemon.meal !== "") {
@@ -267,15 +269,17 @@ export default class PokemonSprite extends DraggableObject {
       }
     }
 
-    this.draggable = playerId === scene.uid && !inBattle
-    if (instanceofPokemonEntity(pokemon)) {
-      const p = <IPokemonEntity>pokemon
-      this.pp = p.pp
-      this.team = p.team
-      this.shield = p.shield
-      this.life = p.life
-      this.critPower = p.critPower
-      this.critChance = p.critChance
+    this.draggable =
+      playerId === scene.uid &&
+      !inBattle &&
+      (scene as GameScene).spectate === false
+    if (isEntity(pokemon)) {
+      this.pp = pokemon.pp
+      this.team = pokemon.team
+      this.shield = pokemon.shield
+      this.life = pokemon.life
+      this.critPower = pokemon.critPower
+      this.critChance = pokemon.critChance
     } else {
       this.critPower = DEFAULT_CRIT_POWER
       this.critChance = DEFAULT_CRIT_CHANCE
@@ -283,10 +287,11 @@ export default class PokemonSprite extends DraggableObject {
     this.setDepth(DEPTH.POKEMON)
 
     // prevents persisting details between game transitions
-    const s = <GameScene>this.scene
-    if (s.lastPokemonDetail) {
-      s.lastPokemonDetail.closeDetail()
-      s.lastPokemonDetail = null
+    const isGameScene = (scene: Phaser.Scene): scene is GameScene =>
+      "lastPokemonDetail" in scene
+    if (isGameScene(this.scene) && this.scene.lastPokemonDetail) {
+      this.scene.lastPokemonDetail.closeDetail()
+      this.scene.lastPokemonDetail = null
     }
   }
 
@@ -325,7 +330,7 @@ export default class PokemonSprite extends DraggableObject {
         return
       }
 
-      const absX = this.x + this.detail.width / 2 + 40
+      const absX = this.x + this.detail.width / 2 + 60
       const minX = this.detail.width / 2
       const maxX = window.innerWidth - this.detail.width / 2
       const absY = this.y - this.detail.height / 2 - 40
@@ -387,11 +392,12 @@ export default class PokemonSprite extends DraggableObject {
       this.stars,
       getPokemonData(this.name as Pkm).stages,
       this.evolution,
+      this.itemsContainer.items,
       this.inBattle
     )
     this.detail
       .setPosition(
-        this.detail.width / 2 + 40,
+        this.detail.width / 2 + 60,
         min(0)(-this.detail.height / 2 - 40)
       )
       .setDepth(DEPTH.TOOLTIP)
@@ -562,7 +568,11 @@ export default class PokemonSprite extends DraggableObject {
       anim,
       this.orientation,
       this.positionX,
-      this.positionY,
+      !this.inBattle
+        ? this.positionY - 1
+        : this.team === Team.RED_TEAM
+          ? 4 - this.positionY
+          : this.positionY,
       this.targetX ?? -1,
       this.targetY ?? -1,
       this.flip
@@ -672,7 +682,6 @@ export default class PokemonSprite extends DraggableObject {
       )
       this.lifebar.setAmount(pokemon.life)
       this.lifebar.setShieldAmount(pokemon.shield)
-      this.lifebar.setDepth(DEPTH.POKEMON_HP_BAR)
       this.add(this.lifebar)
     }
   }
@@ -687,7 +696,6 @@ export default class PokemonSprite extends DraggableObject {
         pokemon.maxPP
       )
       this.powerbar.setAmount(pokemon.pp)
-      this.powerbar.setDepth(DEPTH.POKEMON_HP_BAR)
       this.add(this.powerbar)
     }
   }
@@ -1089,9 +1097,9 @@ export default class PokemonSprite extends DraggableObject {
   addSpikeArmor() {
     if (!this.spikeArmor) {
       this.spikeArmor = this.scene.add
-        .sprite(0, -5, "abilities", `${Ability.SPIKE_ARMOR}/000.png`)
+        .sprite(0, -5, "abilities", `${Ability.SPIKY_SHIELD}/000.png`)
         .setScale(2)
-      this.spikeArmor.anims.play(Ability.SPIKE_ARMOR)
+      this.spikeArmor.anims.play(Ability.SPIKY_SHIELD)
       this.add(this.spikeArmor)
     }
   }
@@ -1106,7 +1114,7 @@ export default class PokemonSprite extends DraggableObject {
   addMagicBounce() {
     if (!this.magicBounce) {
       this.magicBounce = this.scene.add
-        .sprite(0, -5, "abilities", `${Ability.SPIKE_ARMOR}/000.png`)
+        .sprite(0, -5, "abilities", `${Ability.SPIKY_SHIELD}/000.png`)
         .setScale(2)
         .setTint(0xffa0ff)
       this.magicBounce.anims.play(Ability.MAGIC_BOUNCE)
@@ -1126,6 +1134,7 @@ export default class PokemonSprite extends DraggableObject {
     this.light = this.scene.add
       .sprite(0, 0, "abilities", "LIGHT_CELL/000.png")
       .setScale(1.5, 1.5)
+      .setDepth(DEPTH.LIGHT_CELL)
     this.light.anims.play("LIGHT_CELL")
     this.add(this.light)
     this.sendToBack(this.light)
@@ -1214,6 +1223,44 @@ export default class PokemonSprite extends DraggableObject {
 
   removeRageEffect() {
     this.sprite.clearTint()
+  }
+
+  addFlowerTrick() {
+    const flowerTrick = this.scene.add.container()
+
+    for (let i = 0; i < 5; i++) {
+      const flowerSprite = this.scene.add
+        .sprite(0, 0, "abilities", `${Ability.FLOWER_TRICK}/000.png`)
+        .setScale(2)
+      flowerSprite.anims.play({
+        key: Ability.FLOWER_TRICK,
+        frameRate: 7,
+        repeat: -1
+      })
+      flowerTrick.add(flowerSprite)
+    }
+    const circle = new Geom.Circle(0, 0, 48)
+    Phaser.Actions.PlaceOnCircle(flowerTrick.getAll(), circle)
+
+    this.add(flowerTrick)
+
+    this.scene.tweens.add({
+      targets: circle,
+      radius: 50,
+      ease: Phaser.Math.Easing.Quartic.Out,
+      duration: 3000,
+      onUpdate: function (tween) {
+        Phaser.Actions.RotateAroundDistance(
+          flowerTrick.getAll(),
+          { x: 0, y: 0 },
+          0.08,
+          circle.radius
+        )
+      },
+      onComplete: function () {
+        flowerTrick.destroy(true)
+      }
+    })
   }
 }
 

@@ -133,7 +133,7 @@ export class PokemonEntity extends Schema implements IPokemonEntity {
   grassHealCooldown = 2000
   sandstormDamageTimer = 0
   fairySplashCooldown = 0
-  isClone = false
+  isSpawn = false
   refToBoardPokemon: IPokemon
   commands = new Array<SimulationCommand>()
   effectsSet = new Set<EffectClass>()
@@ -236,7 +236,7 @@ export class PokemonEntity extends Schema implements IPokemonEntity {
         (targetEnemies && this.team !== attacker.team) ||
         (attacker.effects.has(Effect.MERCILESS) &&
           attacker.id !== this.id &&
-          this.life <= 0.15 * this.hp))
+          this.life <= 0.1 * this.hp))
     )
   }
 
@@ -259,7 +259,9 @@ export class PokemonEntity extends Schema implements IPokemonEntity {
     return (
       (positionX === lightX && positionY === lightY) ||
       this.items.has(Item.SHINY_STONE) ||
-      (this.passive === Passive.CONVERSION && this.types.has(Synergy.LIGHT))
+      (this.passive === Passive.CONVERSION &&
+        this.types.has(Synergy.LIGHT) &&
+        !this.items.has(Item.LIGHT_BALL))
     )
   }
 
@@ -336,7 +338,7 @@ export class PokemonEntity extends Schema implements IPokemonEntity {
         this.status.triggerBurn(3000, this, attacker)
       }
       if (attacker?.passive === Passive.BERSERK) {
-        attacker.addAbilityPower(3, attacker, 0, false, false)
+        attacker.addAbilityPower(5, attacker, 0, false, false)
       }
 
       const damageResult = this.state.handleDamage({
@@ -1627,7 +1629,8 @@ export class PokemonEntity extends Schema implements IPokemonEntity {
           PokemonFactory.createPokemonFromName(Pkm.COMFEY, target.player),
           nearestAvailableCoordinate.x,
           nearestAvailableCoordinate.y,
-          target.team
+          target.team,
+          false
         )
       }
     }
@@ -1637,12 +1640,15 @@ export class PokemonEntity extends Schema implements IPokemonEntity {
     }
 
     if (this.passive === Passive.GUZZLORD && this.items.has(Item.CHEF_HAT)) {
-      this.addAbilityPower(4, this, 0, false, true)
+      this.addAbilityPower(5, this, 0, false, true)
+      this.addMaxHP(10, this, 0, false, true)
     }
 
     if (
       this.player &&
-      this.simulation.room.state.specialGameRule === SpecialGameRule.BLOOD_MONEY
+      this.simulation.room.state.specialGameRule ===
+        SpecialGameRule.BLOOD_MONEY &&
+      !target.isSpawn
     ) {
       this.player.addMoney(1, true, this)
       this.count.moneyCount += 1
@@ -1812,7 +1818,18 @@ export class PokemonEntity extends Schema implements IPokemonEntity {
               this,
               this.team
             )
-          this.simulation.addPokemon(mon, coord.x, coord.y, this.team, true)
+          const spawnedEntity = this.simulation.addPokemon(
+            mon,
+            coord.x,
+            coord.y,
+            this.team,
+            true
+          )
+          spawnedEntity.shield = 0 // remove existing shield
+          spawnedEntity.flyingProtection = 0 // prevent flying effects twice
+          SynergyEffects[Synergy.FOSSIL].forEach((e) =>
+            spawnedEntity.effects.delete(e)
+          )
         })
       }
     }
@@ -2025,18 +2042,24 @@ export class PokemonEntity extends Schema implements IPokemonEntity {
     }
 
     if (this.effects.has(Effect.BERRY_JUICE)) {
-      this.addShield(50, this, 0, false)
+      this.addShield(80, this, 0, false)
     }
   }
 
-  transferAbility(name: Ability | string) {
+  transferAbility(
+    name: Ability | string,
+    positionX = this.positionX,
+    positionY = this.positionY,
+    targetX = this.targetX,
+    targetY = this.targetY
+  ) {
     this.simulation.room.broadcast(Transfer.ABILITY, {
       id: this.simulation.id,
       skill: name,
-      positionX: this.positionX,
-      positionY: this.positionY,
-      targetX: this.targetX,
-      targetY: this.targetY,
+      positionX: positionX,
+      positionY: positionY,
+      targetX: targetX,
+      targetY: targetY,
       orientation: this.orientation
     })
   }

@@ -30,6 +30,7 @@ import {
   AdditionalPicksStages,
   BOARD_SIDE_HEIGHT,
   BOARD_WIDTH,
+  EvolutionTime,
   FIGHTING_PHASE_DURATION,
   ITEM_CAROUSEL_BASE_DURATION,
   ItemCarouselStages,
@@ -52,6 +53,7 @@ import {
   AbilityPerTM,
   ArtificialItems,
   Berries,
+  CharcadetArmors,
   CraftableItems,
   Dishes,
   FishingRods,
@@ -97,7 +99,7 @@ import { resetArraySchema, values } from "../../utils/schemas"
 import { getWeather } from "../../utils/weather"
 import GameRoom from "../game-room"
 
-export class OnShopCommand extends Command<
+export class OnBuyPokemonCommand extends Command<
   GameRoom,
   {
     playerId: string
@@ -113,7 +115,7 @@ export class OnShopCommand extends Command<
       return
     const player = this.state.players.get(playerId)
     const name = player?.shop[index]
-    if (!player || !name || name === Pkm.DEFAULT) return
+    if (!player || !player.alive || !name || name === Pkm.DEFAULT) return
 
     const pokemon = PokemonFactory.createPokemonFromName(name, player)
     const isEvolution =
@@ -176,13 +178,13 @@ export class OnRemoveFromShopCommand extends Command<
       return
     const player = this.state.players.get(playerId)
     const name = player?.shop[index]
-    if (!player || !name || name === Pkm.DEFAULT) return
+    if (!player || !player.alive || !name || name === Pkm.DEFAULT) return
 
     const cost = getBuyPrice(name, this.state.specialGameRule)
     if (player.money >= cost) {
       player.shop[index] = Pkm.DEFAULT
       player.shopLocked = true
-      this.state.shop.releasePokemon(name, player)
+      this.state.shop.releasePokemon(name, player, this.state)
     }
   }
 }
@@ -198,7 +200,7 @@ export class OnPokemonCatchCommand extends Command<
     if (playerId === undefined || !this.state.players.has(playerId)) return
     const player = this.state.players.get(playerId)
     const pkm = this.state.wanderers.get(id)
-    if (!player || !pkm) return
+    if (!player || !player.alive || !pkm) return
     this.state.wanderers.delete(id)
 
     const pokemon = PokemonFactory.createPokemonFromName(pkm, player)
@@ -220,7 +222,7 @@ export class OnPokemonCatchCommand extends Command<
   }
 }
 
-export class OnDragDropCommand extends Command<
+export class OnDragDropPokemonCommand extends Command<
   GameRoom,
   {
     client: IClient
@@ -238,7 +240,7 @@ export class OnDragDropCommand extends Command<
     const playerId = client.auth.uid
     const player = this.state.players.get(playerId)
 
-    if (player) {
+    if (player && player.alive) {
       message.updateItems = false
       const pokemon = player.board.get(detail.id)
       const { x, y } = detail
@@ -330,7 +332,12 @@ export class OnDragDropCommand extends Command<
           } else if (
             pokemon.canBePlaced &&
             (!target || target.canBeBenched) &&
-            !(dropFromBench && dropToEmptyPlace && isBoardFull)
+            !(
+              dropFromBench &&
+              dropToEmptyPlace &&
+              isBoardFull &&
+              pokemon.doesCountForTeamSize
+            )
           ) {
             // Prevents a pokemon to go on the board only if it's adding a pokemon from the bench on a full board
             this.room.swap(player, pokemon, x, y)
@@ -368,7 +375,7 @@ export class OnSwitchBenchAndBoardCommand extends Command<
   execute({ client, pokemonId }) {
     const playerId = client.auth.uid
     const player = this.room.state.players.get(playerId)
-    if (!player) return
+    if (!player || !player.alive) return
 
     const pokemon = player.board.get(pokemonId)
     if (!pokemon) return
@@ -385,7 +392,11 @@ export class OnSwitchBenchAndBoardCommand extends Command<
           this.room.state.specialGameRule
         )
       const destination = getFirstAvailablePositionOnBoard(player.board)
-      if (pokemon.canBePlaced && destination && !isBoardFull) {
+      if (
+        pokemon.canBePlaced &&
+        destination &&
+        !(isBoardFull && pokemon.doesCountForTeamSize)
+      ) {
         const [dx, dy] = destination
 
         this.room.swap(player, pokemon, dx, dy)
@@ -430,74 +441,70 @@ export class OnDragDropCombineCommand extends Command<
     }
     const player = this.state.players.get(playerId)
 
-    if (player) {
-      message.updateBoard = false
-      message.updateItems = true
+    if (!player || !player.alive) return
 
-      const itemA = detail.itemA
-      const itemB = detail.itemB
+    message.updateBoard = false
+    message.updateItems = true
 
-      //verify player has both items
-      if (!player.items.includes(itemA) || !player.items.includes(itemB)) {
-        client.send(Transfer.DRAG_DROP_FAILED, message)
-        return
-      }
-      // check for two if both items are same
-      else if (itemA == itemB) {
-        let count = 0
-        player.items.forEach((item) => {
-          if (item == itemA) {
-            count++
-          }
-        })
+    const itemA = detail.itemA
+    const itemB = detail.itemB
 
-        if (count < 2) {
-          client.send(Transfer.DRAG_DROP_FAILED, message)
-          return
-        }
-      }
-
-      let result: Item | undefined = undefined
-
-      if (itemA === Item.EXCHANGE_TICKET || itemB === Item.EXCHANGE_TICKET) {
-        const exchangedItem = itemA === Item.EXCHANGE_TICKET ? itemB : itemA
-        if (ItemComponents.includes(exchangedItem)) {
-          result = pickRandomIn(
-            ItemComponents.filter((i) => i !== exchangedItem)
-          )
-        } else if (CraftableItems.includes(exchangedItem)) {
-          result = pickRandomIn(
-            CraftableItems.filter((i) => i !== exchangedItem)
-          )
-        } else {
-          client.send(Transfer.DRAG_DROP_FAILED, message)
-          return
-        }
-      } else {
-        // find recipe result
-        const recipes = Object.entries(ItemRecipe) as [Item, Item[]][]
-        for (const [key, value] of recipes) {
-          if (
-            (value[0] == itemA && value[1] == itemB) ||
-            (value[0] == itemB && value[1] == itemA)
-          ) {
-            result = key
-            break
-          }
-        }
-      }
-
-      if (!result) {
-        client.send(Transfer.DRAG_DROP_FAILED, message)
-        return
-      } else {
-        player.items.push(result)
-        removeInArray(player.items, itemA)
-        removeInArray(player.items, itemB)
-      }
-
-      player.updateSynergies()
+    //verify player has both items
+    if (!player.items.includes(itemA) || !player.items.includes(itemB)) {
+      client.send(Transfer.DRAG_DROP_FAILED, message)
+      return
     }
+    // check for two if both items are same
+    else if (itemA == itemB) {
+      let count = 0
+      player.items.forEach((item) => {
+        if (item == itemA) {
+          count++
+        }
+      })
+
+      if (count < 2) {
+        client.send(Transfer.DRAG_DROP_FAILED, message)
+        return
+      }
+    }
+
+    let result: Item | undefined = undefined
+
+    if (itemA === Item.EXCHANGE_TICKET || itemB === Item.EXCHANGE_TICKET) {
+      const exchangedItem = itemA === Item.EXCHANGE_TICKET ? itemB : itemA
+      if (ItemComponents.includes(exchangedItem)) {
+        result = pickRandomIn(ItemComponents.filter((i) => i !== exchangedItem))
+      } else if (CraftableItems.includes(exchangedItem)) {
+        result = pickRandomIn(CraftableItems.filter((i) => i !== exchangedItem))
+      } else {
+        client.send(Transfer.DRAG_DROP_FAILED, message)
+        return
+      }
+    } else {
+      // find recipe result
+      const recipes = Object.entries(ItemRecipe) as [Item, Item[]][]
+      for (const [key, value] of recipes) {
+        if (
+          (value[0] == itemA && value[1] == itemB) ||
+          (value[0] == itemB && value[1] == itemA)
+        ) {
+          result = key
+          break
+        }
+      }
+    }
+
+    if (!result) {
+      client.send(Transfer.DRAG_DROP_FAILED, message)
+      return
+    } else {
+      player.items.push(result)
+      removeInArray(player.items, itemA)
+      removeInArray(player.items, itemB)
+    }
+
+    player.updateSynergies()
   }
 }
 export class OnDragDropItemCommand extends Command<
@@ -514,7 +521,7 @@ export class OnDragDropItemCommand extends Command<
       updateItems: true
     }
     const player = this.state.players.get(playerId)
-    if (!player) return
+    if (!player || !player.alive) return
 
     message.updateBoard = false
     message.updateItems = true
@@ -564,6 +571,14 @@ export class OnDragDropItemCommand extends Command<
     }
 
     if (Flavors.includes(item) && pokemon.skill !== Ability.DECORATE) {
+      client.send(Transfer.DRAG_DROP_FAILED, message)
+      return
+    }
+
+    if (
+      CharcadetArmors.includes(item) &&
+      pokemon.passive !== Passive.CHARCADET
+    ) {
       client.send(Transfer.DRAG_DROP_FAILED, message)
       return
     }
@@ -643,6 +658,30 @@ export class OnDragDropItemCommand extends Command<
       item === Item.CHEF_HAT &&
       pokemon.types.has(Synergy.GOURMET) === false
     ) {
+      client.send(Transfer.DRAG_DROP_FAILED, message)
+      return
+    }
+
+    if (item === Item.PICNIC_SET) {
+      if (pokemon.meal == "") {
+        values(player.board).forEach((pkm) => {
+          if (
+            pkm.meal === "" &&
+            pkm.canHoldItems &&
+            pokemon &&
+            distanceC(
+              pkm.positionX,
+              pkm.positionY,
+              pokemon.positionX,
+              pokemon.positionY
+            ) <= 1
+          ) {
+            pkm.meal = Item.SANDWICH
+            pkm.action = PokemonActionState.EAT
+          }
+        })
+        removeInArray(player.items, item)
+      }
       client.send(Transfer.DRAG_DROP_FAILED, message)
       return
     }
@@ -788,7 +827,7 @@ export class OnDragDropItemCommand extends Command<
   }
 }
 
-export class OnSellDropCommand extends Command<
+export class OnSellPokemonCommand extends Command<
   GameRoom,
   {
     client: Client
@@ -798,49 +837,49 @@ export class OnSellDropCommand extends Command<
   execute({ client, pokemonId }) {
     const player = this.state.players.get(client.auth.uid)
 
-    if (player) {
-      const pokemon = player.board.get(pokemonId)
-      if (
-        pokemon &&
-        !isOnBench(pokemon) &&
-        this.state.phase === GamePhaseState.FIGHT
-      ) {
-        return // can't sell a pokemon currently fighting
-      }
+    if (!player || !player.alive) return
 
-      if (
-        pokemon &&
-        canSell(pokemon.name, this.state.specialGameRule) === false
-      ) {
-        return
-      }
+    const pokemon = player.board.get(pokemonId)
+    if (
+      pokemon &&
+      !isOnBench(pokemon) &&
+      this.state.phase === GamePhaseState.FIGHT
+    ) {
+      return // can't sell a pokemon currently fighting
+    }
 
-      if (pokemon) {
-        this.state.shop.releasePokemon(pokemon.name, player)
-        const sellPrice = getSellPrice(pokemon, this.state.specialGameRule)
-        player.addMoney(sellPrice, false, null)
-        pokemon.items.forEach((it) => {
-          player.items.push(it)
-        })
+    if (
+      pokemon &&
+      canSell(pokemon.name, this.state.specialGameRule) === false
+    ) {
+      return
+    }
 
-        player.board.delete(pokemonId)
+    if (pokemon) {
+      this.state.shop.releasePokemon(pokemon.name, player, this.state)
+      const sellPrice = getSellPrice(pokemon, this.state.specialGameRule)
+      player.addMoney(sellPrice, false, null)
+      pokemon.items.forEach((it) => {
+        player.items.push(it)
+      })
 
-        player.updateSynergies()
-        player.boardSize = this.room.getTeamSize(player.board)
-        pokemon.afterSell(player)
-      }
+      player.board.delete(pokemonId)
+
+      player.updateSynergies()
+      player.boardSize = this.room.getTeamSize(player.board)
+      pokemon.afterSell(player)
     }
   }
 }
 
-export class OnRefreshCommand extends Command<GameRoom, string> {
+export class OnShopRerollCommand extends Command<GameRoom, string> {
   execute(id) {
     const player = this.state.players.get(id)
-    if (!player) return
+    if (!player || !player.alive) return
     const rollCost = player.shopFreeRolls > 0 ? 0 : 1
     const canRoll = (player?.money ?? 0) >= rollCost
 
-    if (canRoll && player.alive) {
+    if (canRoll) {
       player.rerollCount++
       player.money -= rollCost
       if (player.shopFreeRolls > 0) {
@@ -860,9 +899,8 @@ export class OnRefreshCommand extends Command<GameRoom, string> {
 export class OnLockCommand extends Command<GameRoom, string> {
   execute(id) {
     const player = this.state.players.get(id)
-    if (player) {
-      player.shopLocked = !player.shopLocked
-    }
+    if (!player || !player.alive) return
+    player.shopLocked = !player.shopLocked
   }
 }
 
@@ -875,9 +913,8 @@ export class OnSpectateCommand extends Command<
 > {
   execute({ id, spectatedPlayerId }) {
     const player = this.state.players.get(id)
-    if (player) {
-      player.spectatedPlayerId = spectatedPlayerId
-    }
+    if (!player || !player.alive) return
+    player.spectatedPlayerId = spectatedPlayerId
   }
 }
 
@@ -889,10 +926,10 @@ export class OnLevelUpCommand extends Command<
 > {
   execute(id) {
     const player = this.state.players.get(id)
-    if (!player) return
+    if (!player || !player.alive) return
 
     const cost = getLevelUpCost(this.state.specialGameRule)
-    if (player.money >= cost && player.experienceManager.canLevel()) {
+    if (player.money >= cost && player.experienceManager.canLevelUp()) {
       player.experienceManager.addExperience(4)
       player.money -= cost
     }
@@ -908,7 +945,8 @@ export class OnPickBerryCommand extends Command<
 > {
   execute({ playerId, berryIndex }) {
     const player = this.state.players.get(playerId)
-    if (player && player.berryTreesStage[berryIndex] >= 3) {
+    if (!player || !player.alive) return
+    if (player.berryTreesStage[berryIndex] >= 3) {
       player.berryTreesStage[berryIndex] = 0
       player.items.push(player.berryTreesType[berryIndex])
     }
@@ -1044,7 +1082,7 @@ export class OnUpdatePhaseCommand extends Command<GameRoom> {
           case Effect.BEAT_UP:
             player.titles.add(Title.DELINQUENT)
             break
-          case Effect.STEEL_SURGE:
+          case Effect.MAX_MELTDOWN:
             player.titles.add(Title.ENGINEER)
             break
           case Effect.DEEP_MINER:
@@ -1085,6 +1123,9 @@ export class OnUpdatePhaseCommand extends Command<GameRoom> {
             break
           case Effect.ETHEREAL:
             player.titles.add(Title.BLOB)
+            break
+          case Effect.BANQUET:
+            player.titles.add(Title.CHEF)
             break
           case Effect.DIAMOND_STORM:
             player.titles.add(Title.HIKER)
@@ -1237,10 +1278,10 @@ export class OnUpdatePhaseCommand extends Command<GameRoom> {
       if (player.life <= 0 && player.alive) {
         if (!player.isBot) {
           player.shop.forEach((pkm) => {
-            this.state.shop.releasePokemon(pkm, player)
+            this.state.shop.releasePokemon(pkm, player, this.state)
           })
           player.board.forEach((pokemon) => {
-            this.state.shop.releasePokemon(pokemon.name, player)
+            this.state.shop.releasePokemon(pokemon.name, player, this.state)
           })
         }
         player.alive = false
@@ -1393,8 +1434,10 @@ export class OnUpdatePhaseCommand extends Command<GameRoom> {
         const nbDishes = [0, 1, 2, 2][gourmetLevel] ?? 2
         for (const chef of chefs) {
           let dish = DishByPkm[chef.name]
-          if (chef.name === Pkm.ARCEUS || chef.name === Pkm.KECLEON) {
-            dish = Item.BERRIES
+          if (chef.items.has(Item.COOKING_POT)) {
+            dish = Item.HEARTY_STEW
+          } else if (chef.name === Pkm.ARCEUS || chef.name === Pkm.KECLEON) {
+            dish = Item.SANDWICH
           }
 
           if (chef.passive === Passive.GLUTTON) {

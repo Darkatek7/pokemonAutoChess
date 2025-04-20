@@ -1,6 +1,6 @@
 {
   "name": "pokemon-auto-chess",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "description": "",
   "keywords": [],
   "license": "BSD-3-Clause",
@@ -17,10 +17,12 @@
     "url": "https://github.com/keldaanCommunity/pokemonAutoChess/issues"
   },
   "author": "keldaan-ag",
-  "contributors": ["ogus", "sylvainpolletvillard"],
+  "contributors": [
+    "ogus",
+    "sylvainpolletvillard"
+  ],
   "main": "public/dist/server/app/index.js",
   "scripts": {
-    "reset": "rimraf -rf node_modules/",
     "dev-client": "node esbuild.js --dev",
     "dev-server": "ts-node-dev --watch \"src/**/*\" --respawn --transpile-only ./app/index.ts",
     "dev": "npm-run-all --parallel dev-*",
@@ -38,7 +40,8 @@
     "assetpack": "cd edit/assetpack && npm run assetpack",
     "precompute": "cd gen && ts-node precompute-all.ts",
     "colyseus-post-deploy": "npx colyseus-post-deploy",
-    "deploy-live": "pm2 deploy production update"
+    "deploy-live": "pm2 deploy production update",
+    "check-circular-refs": "npx madge ./app -- --circular --exclude '^public/dist'"
   },
   "dependencies": {
     "@colyseus/command": "^0.3.1",
@@ -48,6 +51,7 @@
     "@colyseus/schema": "^3.0.18",
     "@colyseus/testing": "^0.16.3",
     "@colyseus/tools": "^0.16.2",
+    "@colyseus/uwebsockets-transport": "^0.16.6",
     "@colyseus/ws-transport": "^0.16.3",
     "@joaomoreno/unique-names-generator": "^5.1.0",
     "@reduxjs/toolkit": "^2.2.7",
@@ -65,7 +69,7 @@
     "express-basic-auth": "^1.2.0",
     "express-openapi": "^12.1.3",
     "fast-xml-parser": "^4.4.1",
-    "firebase": "^10.12.4",
+    "firebase": "^10.14.1",
     "firebase-admin": "^12.3.0",
     "firebaseui": "^6.1.0",
     "fs-extra": "^11.2.0",

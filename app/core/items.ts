@@ -102,6 +102,8 @@ export const ItemStats: { [item in Item]?: { [stat in Stat]?: number } } = {
     [Stat.SPE_DEF]: 10
   },
   [Item.INCENSE]: { [Stat.SPE_DEF]: 10, [Stat.AP]: 30 },
+  [Item.COOKING_POT]: { [Stat.DEF]: 10 },
+  [Item.MAX_ELIXIR]: { [Stat.AP]: -25 },
   [Item.EVIOLITE]: {
     [Stat.HP]: 100,
     [Stat.ATK]: 10,
@@ -130,6 +132,7 @@ export const ItemEffects: { [i in Item]?: Effect[] } = {
         if (effect instanceof SoulDewEffect) {
           pokemon.addAbilityPower(-10 * effect.count, pokemon, 0, false)
           pokemon.effectsSet.delete(effect)
+          pokemon.count.soulDewCount = 0
           break
         }
       }

@@ -669,6 +669,109 @@ export function displayAbility(
       break
     }
 
+    case "SCALE_SHOT_CHARGE": {
+      const charge = scene.add
+        .sprite(
+          coordinates[0],
+          coordinates[1],
+          "abilities",
+          `${Ability.SCALE_SHOT}/000.png`
+        )
+        .setScale(2)
+        .setDepth(DEPTH.ABILITY)
+
+      charge.anims.play({
+        key: Ability.SCALE_SHOT,
+        duration: 300,
+        repeat: -1
+      })
+
+      scene.tweens.add({
+        targets: charge,
+        duration: delay,
+        x: coordinatesTarget[0],
+        y: coordinatesTarget[1],
+        onComplete: () => {
+          charge.destroy()
+        }
+      })
+      break
+    }
+
+    case Ability.SCALE_SHOT: {
+      const specialProjectile = addAbilitySprite(skill, coordinates).setScale(2)
+      scene.tweens.add({
+        targets: specialProjectile,
+        x: coordinatesTarget[0],
+        y: coordinatesTarget[1],
+        ease: "linear",
+        yoyo: false,
+        duration: 400,
+        onComplete: () => {
+          specialProjectile.destroy()
+        }
+      })
+      break
+    }
+
+    case "SOLAR_BLADE_CHARGE": {
+      const charge = scene.add
+        .sprite(
+          coordinates[0],
+          coordinates[1],
+          "abilities",
+          `${Ability.RECOVER}/000.png`
+        )
+        .setScale(3)
+        .setDepth(DEPTH.ABILITY)
+      charge.anims.play({
+        key: Ability.RECOVER,
+        duration: 500,
+        repeat: -1
+      })
+      scene.tweens.add({
+        targets: charge,
+        duration: 2000,
+        x: coordinates[0],
+        y: coordinates[1],
+        onComplete: () => {
+          charge.destroy()
+        }
+      })
+      break
+    }
+
+    case Ability.SOLAR_BLADE: {
+      const specialProjectile = addAbilitySprite(skill, coordinates)
+        .setScale(3)
+        .setRotation(
+          Math.atan2(
+            coordinatesTarget[1] - coordinates[1],
+            coordinatesTarget[0] - coordinates[0]
+          ) +
+            Math.PI / 2
+        )
+      const [dx, dy] = OrientationVector[orientation]
+      const finalCoordinates = transformAttackCoordinate(
+        positionX + dx * 1.5,
+        positionY + dy * 1.5,
+        flip
+      )
+
+      scene.tweens.add({
+        targets: specialProjectile,
+        x: finalCoordinates[0],
+        y: finalCoordinates[1],
+        ease: "linear",
+        yoyo: false,
+        duration: 500,
+        onComplete: () => {
+          specialProjectile.destroy()
+        }
+      })
+      break
+    }
+
     case Ability.FROST_BREATH:
       addAbilitySprite(skill, [coordinates[0], coordinates[1] - 30], true)
         .setOrigin(-0.1, 0.5)
@@ -685,7 +788,7 @@ export function displayAbility(
       addAbilitySprite(skill, coordinatesTarget, true).setScale(3)
       break
 
-    case Ability.ROOT:
+    case Ability.INGRAIN:
       addAbilitySprite(skill, coordinates, true).setScale(2)
       break
 
@@ -1161,7 +1264,7 @@ export function displayAbility(
       break
     }
 
-    case Ability.EMPTY_LIGHT: {
+    case Ability.ACID_SPRAY: {
       const specialProjectile = addAbilitySprite(skill, coordinates).setScale(2)
       scene.tweens.add({
         targets: specialProjectile,
@@ -1324,7 +1427,7 @@ export function displayAbility(
       break
     }
 
-    case Ability.EGGSPLOSION: {
+    case Ability.EGG_BOMB: {
       const specialProjectile = addAbilitySprite(skill, coordinates).setScale(3)
       scene.tweens.add({
         targets: specialProjectile,
@@ -1348,6 +1451,24 @@ export function displayAbility(
         ease: "linear",
         duration: 300,
         delay: (delay || 0) * 400,
+        onComplete: () => {
+          specialProjectile.destroy()
+        }
+      })
+      break
+    }
+
+    case Ability.SUCTION_HEAL: {
+      const specialProjectile = addAbilitySprite(
+        skill,
+        coordinatesTarget
+      ).setScale(3)
+      scene.tweens.add({
+        targets: specialProjectile,
+        x: coordinates[0],
+        y: coordinates[1],
+        ease: "linear",
+        duration: 500,
         onComplete: () => {
           specialProjectile.destroy()
         }
@@ -1462,6 +1583,10 @@ export function displayAbility(
       addAbilitySprite(skill, coordinates, true).setScale(2)
       break
 
+    case Ability.BULLDOZE:
+      addAbilitySprite(Ability.HEAVY_SLAM, coordinates, true).setScale(2)
+      break
+
     case Ability.FACADE:
       addAbilitySprite(skill, coordinatesTarget, true).setScale(2)
       break
@@ -1569,6 +1694,24 @@ export function displayAbility(
       })
       break
     }
+
+    case Ability.ARMOR_CANNON: {
+      const specialProjectile = addAbilitySprite(skill, coordinates).setScale(2)
+      scene.tweens.add({
+        targets: specialProjectile,
+        x: coordinatesTarget[0],
+        y: coordinatesTarget[1],
+        duration: 400,
+        onComplete: () => {
+          specialProjectile.destroy()
+        }
+      })
+      break
+    }
+
+    case Ability.BITTER_BLADE:
+      addAbilitySprite(skill, coordinates, true).setScale(3)
+      break
 
     case Ability.ASSURANCE:
       addAbilitySprite(skill, coordinatesTarget, true).setScale(2)
@@ -2340,7 +2483,7 @@ export function displayAbility(
       break
     }
 
-    case Ability.SPIKE_ARMOR:
+    case Ability.SPIKY_SHIELD:
       OrientationArray.forEach((orientation) => {
         const [dx, dy] = OrientationVector[orientation]
         const finalCoordinates = transformAttackCoordinate(
@@ -2369,7 +2512,7 @@ export function displayAbility(
       break
 
     case Ability.MACH_PUNCH:
-    case Ability.UPPERCUT: {
+    case Ability.MEGA_PUNCH: {
       const specialProjectile = addAbilitySprite(
         "FIGHTING/FIST",
         coordinatesTarget
@@ -2968,8 +3111,72 @@ export function displayAbility(
       addAbilitySprite(skill, coordinates, true).setScale(2)
       break
 
-    case Ability.MAGNET_BOMB:
-      addAbilitySprite(skill, coordinatesTarget, true).setScale(2)
+    case Ability.MAGNET_BOMB: {
+      const bomb = addAbilitySprite(skill, coordinates, true).setScale(2)
+      scene.tweens.add({
+        targets: bomb,
+        duration: 400,
+        x: coordinatesTarget[0],
+        y: coordinatesTarget[1],
+        onComplete: () => {
+          bomb.destroy()
+        }
+      })
+      break
+    }
+
+    case "ELECTRO_SHOT_CHARGE": {
+      const charge = addAbilitySprite(
+        Ability.MAGNET_BOMB,
+        coordinates
+      ).setScale(2)
+      scene.tweens.add({
+        targets: charge,
+        duration: 2000,
+        x: coordinates[0],
+        y: coordinates[1],
+        onComplete: () => {
+          charge.destroy()
+        }
+      })
+      break
+    }
+
+    case Ability.ELECTRO_SHOT:
+      {
+        const shot = addAbilitySprite(skill, coordinates)
+          .setScale(4)
+          .setOrigin(0, 0.5)
+          .setRotation(
+            Math.atan2(
+              coordinatesTarget[1] - coordinates[1],
+              coordinatesTarget[0] - coordinates[0]
+            )
+          )
+
+        scene.tweens.add({
+          targets: shot,
+          duration: 1000,
+          x: coordinates[0],
+          y: coordinates[1],
+          onComplete: () => {
+            shot.destroy()
+          }
+        })
+      }
+      break
+
+    case "FLOWER_TRICK_EXPLOSION":
+      addAbilitySprite("PUFF_PINK", coordinates, true).setScale(3)
+      break
+
+    case Ability.FLOWER_TRICK:
+      {
+        const target = pokemonsOnBoard.find(
+          (pkmUI) => pkmUI.positionX === targetX && pkmUI.positionY === targetY
+        )
+        target?.addFlowerTrick()
+      }
       break
 
     case Ability.GUNK_SHOT: {
@@ -3100,14 +3307,14 @@ export function displayAbility(
 
     case "SPAWN":
       addAbilitySprite("SPAWN", coordinates, true)
-        .setOrigin(0.5, -1.5)
+        .setOrigin(0.5, -0.5)
         .setDepth(DEPTH.BOOST_BACK)
         .setScale(2)
       break
 
     case "EVOLUTION":
       addAbilitySprite("EVOLUTION", coordinates, true)
-        .setOrigin(0.5, -0.4)
+        .setOrigin(0.5, 0.4)
         .setDepth(DEPTH.BOOST_BACK)
         .setScale(2)
       break

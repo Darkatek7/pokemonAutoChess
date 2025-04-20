@@ -63,7 +63,7 @@ import {
   setSpecialGameRule,
   setPodium
 } from "../stores/GameStore"
-import { joinGame, logIn, setErrorAlertMessage, setProfile } from "../stores/NetworkStore"
+import { joinGame, logIn, setConnectionStatus, setErrorAlertMessage, setProfile } from "../stores/NetworkStore"
 import { getAvatarString } from "../../../utils/avatar"
 import GameDpsMeter from "./component/game/game-dps-meter"
 import GameFinalRank from "./component/game/game-final-rank"
@@ -77,18 +77,16 @@ import GameStageInfo from "./component/game/game-stage-info"
 import GameSynergies from "./component/game/game-synergies"
 import GameToasts from "./component/game/game-toasts"
 import { MainSidebar } from "./component/main-sidebar/main-sidebar"
+import { ConnectionStatusNotification } from "./component/system/connection-status-notification"
 import { playMusic, preloadMusic } from "./utils/audio"
 import { LocalStoreKeys, localStore } from "./utils/store"
 import { FIREBASE_CONFIG } from "./utils/utils"
 import { Passive } from "../../../types/enum/Passive"
 import { Item } from "../../../types/enum/Item"
 import { CloseCodes, CloseCodesMessages } from "../../../types/enum/CloseCodes"
+import { ConnectionStatus } from "../../../types/enum/ConnectionStatus"
 
 let gameContainer: GameContainer
-
-export function getGameContainer(): GameContainer {
-  return gameContainer
-}
 
 export function getGameScene(): GameScene | undefined {
   return gameContainer?.game?.scene?.getScene<GameScene>("gameScene") as
@@ -101,6 +99,7 @@ export default function Game() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const client: Client = useAppSelector((state) => state.network.client)
+  const connectionStatus = useAppSelector(state => state.network.connectionStatus)
   const room: Room<GameState> | undefined = useAppSelector(
     (state) => state.network.game
   )
@@ -153,6 +152,7 @@ export default function Game() {
             dispatch(joinGame(room))
             connected.current = true
             connecting.current = false
+            dispatch(setConnectionStatus(ConnectionStatus.CONNECTED))
           })
           .catch((error) => {
             if (attempts < MAX_ATTEMPS_RECONNECT) {
@@ -165,6 +165,7 @@ export default function Game() {
               }
               //TODO: handle more known error codes with informative messages
               setConnectError(connectError)
+              dispatch(setConnectionStatus(ConnectionStatus.CONNECTION_FAILED))
               logger.error("reconnect error", error)
             }
           })
@@ -181,7 +182,6 @@ export default function Game() {
       // if spectating game we switch directly without notifying the server to not show spectators avatars
       if (room?.state?.players) {
         const spectatedPlayer = room?.state?.players.get(id)
-        const gameContainer = getGameContainer()
         if (spectatedPlayer) {
           gameContainer.setPlayer(spectatedPlayer)
 
@@ -283,6 +283,17 @@ export default function Game() {
     }
   }, [client, dispatch, room])
 
+  const spectateTillTheEnd = () => {
+    setFinalRankVisibility(FinalRankVisibility.CLOSED)
+    gameContainer.spectate = true
+    if (gameContainer.gameScene) {
+      gameContainer.gameScene.spectate = true
+      // rerender to make items and units not dragable anymore
+      gameContainer.gameScene?.board?.renderBoard()
+      gameContainer.gameScene?.itemsContainer?.render(gameContainer.player!.items)
+    }
+  }
+
   useEffect(() => {
     // create a history entry to prevent back button switching page immediately, and leave game properly instead
     window.history.pushState(null, "", window.location.href)
@@ -374,8 +385,7 @@ export default function Game() {
           gameScene.load.once("complete", () => {
             if (!PortalCarouselStages.includes(room.state.stageLevel)) {
               // map loaded after the end of the portal carousel stage, we swap it now. better later than never
-              const gc = getGameContainer()
-              gc && gc.player && gameScene.setMap(gc.player.map)
+              gameContainer && gameContainer.player && gameScene.setMap(gameContainer.player.map)
             }
           })
           gameScene.load.start()
@@ -515,6 +525,15 @@ export default function Game() {
           const scene = getGameScene()
           if (scene?.music) scene.music.destroy()
           navigate("/lobby")
+        } else if (code >= 1001 && code <= 1015) {
+          // Between 1001 and 1015 - Abnormal socket shutdown
+          if (connectionStatus === ConnectionStatus.CONNECTED) {
+            dispatch(setConnectionStatus(ConnectionStatus.CONNECTION_LOST))
+            // attempting to auto reconnect
+            connectToGame()
+          } else {
+            dispatch(setConnectionStatus(ConnectionStatus.CONNECTION_FAILED))
+          }
         }
       })
 
@@ -646,6 +665,7 @@ export default function Game() {
             && finalRankVisibility === FinalRankVisibility.HIDDEN
           ) {
             setFinalRankVisibility(FinalRankVisibility.VISIBLE)
+            getGameScene()?.input.keyboard?.removeAllListeners()
           }
         })
         $player.listen("experienceManager", (experienceManager) => {
@@ -696,7 +716,6 @@ export default function Game() {
         $player.listen("spectatedPlayerId", (spectatedPlayerId) => {
           if (room?.state?.players) {
             const spectatedPlayer = room?.state?.players.get(spectatedPlayerId)
-            const gameContainer = getGameContainer()
             if (spectatedPlayer && player.id === uid) {
               gameContainer.setPlayer(spectatedPlayer)
 
@@ -792,7 +811,7 @@ export default function Game() {
           <MainSidebar page="game" leave={leave} leaveLabel={t("leave_game")} />
           <GameFinalRank
             rank={finalRank}
-            hide={() => setFinalRankVisibility(FinalRankVisibility.CLOSED)}
+            hide={spectateTillTheEnd}
             leave={leave}
             visible={finalRankVisibility === FinalRankVisibility.VISIBLE}
           />
@@ -808,6 +827,7 @@ export default function Game() {
       ) : (
         <GameLoadingScreen connectError={connectError} />
       )}
+      <ConnectionStatusNotification />
     </main>
   )
 }

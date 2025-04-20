@@ -43,6 +43,7 @@ import {
   BoosterRarityProbability,
   DUST_PER_BOOSTER,
   DUST_PER_SHINY,
+  EloRankThreshold,
   MAX_PLAYERS_PER_GAME,
   getEmotionCost
 } from "../../types/Config"
@@ -1048,34 +1049,41 @@ export class JoinOrOpenRoomCommand extends Command<
           case EloRank.LEVEL_BALL:
           case EloRank.NET_BALL:
             minRank = EloRank.LEVEL_BALL
-            maxRank = EloRank.NET_BALL
+            maxRank = EloRank.SAFARI_BALL
             break
           case EloRank.SAFARI_BALL:
           case EloRank.LOVE_BALL:
           case EloRank.PREMIER_BALL:
-            minRank = EloRank.SAFARI_BALL
-            maxRank = EloRank.PREMIER_BALL
+            minRank = EloRank.NET_BALL
+            maxRank = EloRank.QUICK_BALL
             break
           case EloRank.QUICK_BALL:
           case EloRank.POKE_BALL:
           case EloRank.SUPER_BALL:
-            minRank = EloRank.QUICK_BALL
-            maxRank = EloRank.SUPER_BALL
+            minRank = EloRank.PREMIER_BALL
+            maxRank = EloRank.ULTRA_BALL
             break
           case EloRank.ULTRA_BALL:
           case EloRank.MASTER_BALL:
           case EloRank.BEAST_BALL:
-            minRank = EloRank.ULTRA_BALL
+            minRank = EloRank.SUPER_BALL
             maxRank = EloRank.BEAST_BALL
             break
         }
-        const existingRanked = this.room.rooms?.find(
-          (room) =>
+        const existingRanked = this.room.rooms?.find((room) => {
+          const { minRank, maxRank, gameMode } = room.metadata ?? {}
+          const minElo = minRank ? EloRankThreshold[minRank] : 0
+          const maxRankThreshold = maxRank
+            ? EloRankThreshold[maxRank]
+            : Infinity
+          return (
             room.name === "preparation" &&
-            room.metadata?.gameMode === GameMode.RANKED &&
-            room.metadata?.minRank === minRank &&
+            gameMode === GameMode.RANKED &&
+            user.elo >= minElo &&
+            (user.elo <= maxRankThreshold || userRank === maxRank) &&
             room.clients < MAX_PLAYERS_PER_GAME
-        )
+          )
+        })
         if (existingRanked) {
           client.send(Transfer.REQUEST_ROOM, existingRanked.roomId)
         } else {
@@ -1528,19 +1536,23 @@ export class EndTournamentCommand extends Command<
         const user = this.room.users.get(player.id)
 
         const mongoUser = await UserMetadata.findOne({ uid: player.id })
-        if (mongoUser == null || user == null) continue
+        if (mongoUser === null) continue
+
+        logger.debug(
+          `Tournament ${tournamentId} finalist ${player.name} finished with rank ${rank}, distributing rewards`
+        )
 
         mongoUser.booster += 3 // 3 boosters for top 8
         if (mongoUser.titles.includes(Title.ACE_TRAINER) === false) {
           mongoUser.titles.push(Title.ACE_TRAINER)
-          user.titles.push(Title.ACE_TRAINER)
+          if (user) user.titles.push(Title.ACE_TRAINER)
         }
 
         if (rank <= 4) {
           mongoUser.booster += 3 // 6 boosters for top 4
           if (mongoUser.titles.includes(Title.ELITE_FOUR_MEMBER) === false) {
             mongoUser.titles.push(Title.ELITE_FOUR_MEMBER)
-            user.titles.push(Title.ELITE_FOUR_MEMBER)
+            if (user) user.titles.push(Title.ELITE_FOUR_MEMBER)
           }
         }
 
@@ -1548,11 +1560,11 @@ export class EndTournamentCommand extends Command<
           mongoUser.booster += 4 // 10 boosters for top 1
           if (mongoUser.titles.includes(Title.CHAMPION) === false) {
             mongoUser.titles.push(Title.CHAMPION)
-            user.titles.push(Title.CHAMPION)
+            if (user) user.titles.push(Title.CHAMPION)
           }
         }
 
-        user.booster = mongoUser.booster
+        if (user) user.booster = mongoUser.booster
         await mongoUser.save()
       }
 

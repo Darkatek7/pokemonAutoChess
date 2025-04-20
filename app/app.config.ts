@@ -1,6 +1,8 @@
 import path from "path"
 import { monitor } from "@colyseus/monitor"
 import config from "@colyseus/tools"
+import { uWebSocketsTransport } from "@colyseus/uwebsockets-transport"
+import uWebSockets from "uWebSockets.js"
 import {
   Presence,
   RedisDriver,
@@ -77,13 +79,28 @@ if (process.env.NODE_APP_INSTANCE) {
           ? p1.roomCount - p2.roomCount
           : p1.ccu - p2.ccu
       )
-      return stats[0].processId
+      if (stats.length === 0) {
+        throw "No process available"
+      } else {
+        return stats[0]?.processId
+      }
     }
   }
 }
 
+if (process.env.MODE === "dev") {
+  gameOptions.devMode = true
+}
+
 export default config({
   options: gameOptions,
+
+  initializeTransport: function () {
+    return new uWebSocketsTransport({
+      compression: uWebSockets.SHARED_COMPRESSOR
+    })
+  },
+
   initializeGameServer: (gameServer) => {
     /**
      * Define your room handlers:
@@ -266,7 +283,7 @@ export default config({
 
       const stats = await DetailledStatistic.find(
         { playerId: playerUid },
-        ["pokemons", "time", "rank", "elo"],
+        ["pokemons", "time", "rank", "elo", "gameMode"],
         { limit: limit, skip: skip, sort: { time: -1 } }
       )
       if (stats) {
@@ -276,7 +293,8 @@ export default config({
               record.time,
               record.rank,
               record.elo,
-              record.pokemons
+              record.pokemons,
+              record.gameMode
             )
         )
 
@@ -303,9 +321,12 @@ export default config({
     })
 
     app.get("/bots", async (req, res) => {
-      const botsData = await getBotsList({
-        withSteps: req.query.withSteps === "true"
-      })
+      const botsData =
+        await getBotsList(
+          //breaks build {
+          //   withSteps: req.query.withSteps === "true"
+          // }
+        )
       res.send(botsData)
     })
 

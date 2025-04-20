@@ -66,7 +66,7 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
   BERRIES: [],
   BERRY_JUICE: [
     new OnSpawnEffect((entity) => {
-      entity.addShield(50, entity, 0, false)
+      entity.addShield(80, entity, 0, false)
       entity.effects.add(EffectEnum.BERRY_JUICE)
     })
   ],
@@ -117,20 +117,25 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
   ],
   FRUIT_JUICE: [
     new OnSpawnEffect((entity) => {
-      entity.addSpeed(30, entity, 0, false)
+      entity.addSpeed(50, entity, 0, false)
+    })
+  ],
+  HEARTY_STEW: [
+    new OnSpawnEffect((entity) => {
+      entity.addMaxHP(0.3 * entity.baseHP, entity, 0, false)
     })
   ],
   HONEY: [],
   LARGE_LEEK: [
     new OnSpawnEffect((entity) => {
       entity.effects.add(EffectEnum.ABILITY_CRIT)
-      entity.addCritPower(30, entity, 0, false)
+      entity.addCritPower(100, entity, 0, false)
     })
   ],
   LEEK: [
     new OnSpawnEffect((entity) => {
       entity.effects.add(EffectEnum.ABILITY_CRIT)
-      entity.addCritChance(30, entity, 0, false)
+      entity.addCritChance(50, entity, 0, false)
     })
   ],
   LEFTOVERS: [],
@@ -159,12 +164,71 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
   ],
   RAGE_CANDY_BAR: [
     new OnSpawnEffect((entity) => {
-      entity.addAttack(5, entity, 0, false)
+      entity.addAttack(10, entity, 0, false)
     })
   ],
   ROCK_SALT: [
     new OnSpawnEffect((entity) => {
       entity.status.triggerRuneProtect(8000)
+    })
+  ],
+  SANDWICH: [
+    new OnSpawnEffect((entity) => {
+      entity.types.forEach((type) => {
+        switch (type) {
+          case Synergy.GRASS:
+          case Synergy.MONSTER:
+          case Synergy.GOURMET:
+          case Synergy.BUG:
+          case Synergy.AMORPHOUS:
+            entity.addMaxHP(20, entity, 0, false)
+            break
+          case Synergy.NORMAL:
+          case Synergy.ARTIFICIAL:
+          case Synergy.DRAGON:
+          case Synergy.BABY:
+            entity.addShield(30, entity, 0, false)
+            break
+          case Synergy.FIRE:
+          case Synergy.STEEL:
+          case Synergy.FOSSIL:
+            entity.addAttack(5, entity, 0, false)
+            break
+          case Synergy.FLYING:
+          case Synergy.GHOST:
+            entity.addDodgeChance(5, entity, 0, false)
+            break
+          case Synergy.ELECTRIC:
+          case Synergy.FIELD:
+          case Synergy.WILD:
+            entity.addSpeed(10, entity, 0, false)
+            break
+          case Synergy.ICE:
+          case Synergy.AQUATIC:
+          case Synergy.FLORA:
+            entity.addSpecialDefense(5, entity, 0, false)
+            break
+          case Synergy.GROUND:
+          case Synergy.FIGHTING:
+          case Synergy.ROCK:    
+            entity.addDefense(5, entity, 0, false)
+            break
+          case Synergy.PSYCHIC:
+          case Synergy.HUMAN:
+          case Synergy.LIGHT:
+            entity.addAbilityPower(20, entity, 0, false)
+            break
+          case Synergy.FAIRY:
+          case Synergy.DARK:
+            entity.addCritChance(5, entity, 0, false)
+            entity.addCritPower(10, entity, 0, false)
+            break
+          case Synergy.WATER:
+          case Synergy.SOUND:
+            entity.addPP(20, entity, 0, false)
+            break
+        }
+      })
     })
   ],
   SMOKED_FILET: [
@@ -217,12 +281,12 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
   ],
   SWEET_HERB: [
     new OnSpawnEffect((entity) => {
-      entity.addAbilityPower(50, entity, 0, false)
+      entity.addAbilityPower(80, entity, 0, false)
     })
   ],
   TEA: [
     new OnSpawnEffect((entity) => {
-      entity.addPP(50, entity, 0, false)
+      entity.addPP(80, entity, 0, false)
     })
   ],
   WHIPPED_DREAM: [
@@ -254,7 +318,7 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
   ],
   CLOVER_SWEET: [
     new OnSpawnEffect((entity) => {
-      entity.addLuck(5, entity, 0, false, true)
+      entity.addLuck(10, entity, 0, false, true)
     })
   ],
   FLOWER_SWEET: [

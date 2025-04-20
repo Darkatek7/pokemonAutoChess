@@ -95,6 +95,7 @@ export enum Item {
   ROTOM_PHONE = "ROTOM_PHONE",
   SILK_SCARF = "SILK_SCARF",
   TINY_MUSHROOM = "TINY_MUSHROOM",
+  COOKING_POT = "COOKING_POT",
   METEORITE = "METEORITE",
   TRASH = "TRASH",
   DYNAMAX_BAND = "DYNAMAX_BAND",
@@ -110,6 +111,8 @@ export enum Item {
   SACRED_ASH = "SACRED_ASH",
   COMET_SHARD = "COMET_SHARD",
   REPEAT_BALL = "REPEAT_BALL",
+  GOLD_BOW = "GOLD_BOW",
+  MAX_ELIXIR = "MAX_ELIXIR",
   DAMP_ROCK = "DAMP_ROCK",
   ICY_ROCK = "ICY_ROCK",
   HEAT_ROCK = "HEAT_ROCK",
@@ -143,6 +146,9 @@ export enum Item {
   HM_WHIRLPOOL = "HM_WHIRLPOOL",
   HM_WATERFALL = "HM_WATERFALL",
   CHEF_HAT = "CHEF_HAT",
+  PICNIC_SET = "PICNIC_SET",
+  SANDWICH = "SANDWICH",
+  HEARTY_STEW = "HEARTY_STEW",
   RAGE_CANDY_BAR = "RAGE_CANDY_BAR",
   TEA = "TEA",
   CURRY = "CURRY",
@@ -186,7 +192,9 @@ export enum Item {
   RAINBOW_SWIRL_FLAVOR = "RAINBOW_SWIRL_FLAVOR",
   EGG_FOR_SELL = "EGG_FOR_SELL",
   GIMMIGHOUL_COIN = "GIMMIGHOUL_COIN",
-  EXCHANGE_TICKET = "EXCHANGE_TICKET"
+  EXCHANGE_TICKET = "EXCHANGE_TICKET",
+  AUSPICIOUS_ARMOR = "AUSPICIOUS_ARMOR",
+  MALICIOUS_ARMOR = "MALICIOUS_ARMOR"
 }
 
 export const AllItems: Item[] = Object.values(Item)
@@ -200,6 +208,8 @@ export const SpecialItems: Item[] = [
   Item.CORNERSTONE_MASK,
   Item.HEARTHFLAME_MASK,
   Item.ZYGARDE_CUBE,
+  Item.AUSPICIOUS_ARMOR,
+  Item.MALICIOUS_ARMOR,
   Item.BERRY_JUICE,
   Item.FIRE_SHARD,
   Item.OLD_ROD,
@@ -207,6 +217,7 @@ export const SpecialItems: Item[] = [
   Item.SUPER_ROD,
   Item.TRASH,
   Item.CHEF_HAT,
+  Item.PICNIC_SET,
   Item.VANILLA_FLAVOR,
   Item.RUBY_FLAVOR,
   Item.MATCHA_FLAVOR,
@@ -313,22 +324,24 @@ export const Berries: Item[] = [
 ]
 
 export const ArtificialItems: Item[] = [
-  Item.EXP_SHARE,
-  Item.ELECTIRIZER,
-  Item.MAGMARIZER,
   Item.LIGHT_BALL,
   Item.TOXIC_ORB,
   Item.HARD_STONE,
   Item.METAL_COAT,
   Item.SWIFT_WING,
   Item.MACHO_BRACE,
-  Item.INCENSE,
   Item.METRONOME,
   Item.BIG_NUGGET,
-  Item.POKERUS_VIAL,
   Item.ROTOM_PHONE,
   Item.SILK_SCARF,
-  Item.TINY_MUSHROOM
+  Item.TINY_MUSHROOM,
+  Item.COOKING_POT,
+  Item.INCENSE,
+  Item.ELECTIRIZER,
+  Item.MAGMARIZER,
+  Item.POKERUS_VIAL,
+  Item.MAX_ELIXIR,
+  Item.EXP_SHARE
 ]
 
 export const ShinyItems: Item[] = [
@@ -341,7 +354,8 @@ export const ShinyItems: Item[] = [
   Item.ABSORB_BULB,
   Item.SACRED_ASH,
   Item.COMET_SHARD,
-  Item.REPEAT_BALL
+  Item.REPEAT_BALL,
+  Item.GOLD_BOW
 ]
 
 export const WeatherRocks: Item[] = [
@@ -411,7 +425,8 @@ export const SynergyItems = [
   Item.ROTOM_PHONE,
   Item.SHINY_STONE,
   Item.SILK_SCARF,
-  Item.TINY_MUSHROOM
+  Item.TINY_MUSHROOM,
+  Item.COOKING_POT
 ] as const
 
 export const SynergyGivenByItem: Record<
@@ -438,7 +453,8 @@ export const SynergyGivenByItem: Record<
   [Item.ROTOM_PHONE]: Synergy.GHOST,
   [Item.SHINY_STONE]: Synergy.LIGHT,
   [Item.SILK_SCARF]: Synergy.NORMAL,
-  [Item.TINY_MUSHROOM]: Synergy.BUG
+  [Item.TINY_MUSHROOM]: Synergy.BUG,
+  [Item.COOKING_POT]: Synergy.GOURMET
 }
 
 export const NonSpecialItemComponents: Item[] = [
@@ -547,7 +563,9 @@ export const Dishes = [
   Item.FLOWER_SWEET,
   Item.STAR_SWEET,
   Item.RIBBON_SWEET,
-  Item.SWEETS
+  Item.SWEETS,
+  Item.SANDWICH,
+  Item.HEARTY_STEW
 ] as const
 
 export type Dish = (typeof Dishes)[number]
@@ -562,7 +580,7 @@ export const Flavors = [
   Item.RUBY_SWIRL_FLAVOR,
   Item.CARAMEL_SWIRL_FLAVOR,
   Item.RAINBOW_SWIRL_FLAVOR
-]
+] as const
 
 export const SynergyFlavors: {
   [key in Synergy]:
@@ -620,3 +638,5 @@ export const Sweets = [
   Item.STAR_SWEET,
   Item.RIBBON_SWEET
 ]
+
+export const CharcadetArmors = [Item.AUSPICIOUS_ARMOR, Item.MALICIOUS_ARMOR]

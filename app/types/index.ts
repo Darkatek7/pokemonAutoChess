@@ -47,7 +47,9 @@ export const CDN_URL =
 export const USERNAME_REGEXP = /^(\p{Letter}|[0-9]|\.|-|_){3,24}$/u
 
 export type PkmCustom = { shiny?: boolean; emotion?: Emotion }
-export type PkmWithCustom = { name: Pkm } & PkmCustom
+export interface PkmWithCustom extends PkmCustom {
+  name: Pkm
+}
 
 export enum Role {
   ADMIN = "ADMIN",
@@ -487,12 +489,6 @@ export interface IDps {
   shield: number
 }
 
-export function instanceofPokemonEntity(
-  obj: IPokemon | IPokemonEntity | IPokemonAvatar
-): obj is IPokemonEntity {
-  return "pp" in obj
-}
-
 export interface IPokemonEntity {
   simulation: ISimulation
   refToBoardPokemon: IPokemon
@@ -631,7 +627,7 @@ export interface IPokemonEntity {
   healDone: number
   shiny: boolean
   emotion: Emotion
-  isClone: boolean
+  isSpawn: boolean
   commands: ISimulationCommand[]
   effectsSet: Set<EffectClass>
   flyingProtection: number
@@ -759,6 +755,7 @@ export enum Title {
   ALCHEMIST = "ALCHEMIST",
   BERSERKER = "BERSERKER",
   BLOB = "BLOB",
+  CHEF = "CHEF",
   HARLEQUIN = "HARLEQUIN",
   TACTICIAN = "TACTICIAN",
   STRATEGIST = "STRATEGIST",
