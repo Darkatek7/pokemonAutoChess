@@ -2,7 +2,7 @@
 
 Your privacy is important to us! It is Keldaan's policy to respect your privacy and comply with any applicable law and regulation regarding any personal information we may collect about you, including across our website, https://pokemon.darkatek7.com, and other sites we own and operate.
 
-This policy is effective as of 5 Ausgust 2024 and was last updated on 5 Ausgust 2024.
+This policy is effective as of 5 Ausgust 2024 and was last updated on 6 Ausgust 2024.
 
 # How to request the deletion of your data?
 
