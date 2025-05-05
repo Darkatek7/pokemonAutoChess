@@ -22,7 +22,7 @@ Please be aware that while this information may not be personally identifying by
 
 We may ask for personal information which may include one or more of the following:
 
-Email
+Email!
 
 # Legitimate Reasons for Processing Your Personal Information
 
