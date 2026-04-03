@@ -1,35 +1,43 @@
+import firebase from "firebase/compat/app"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { useSearchParams } from "react-router-dom"
 import {
-  IBot,
-  IDetailledPokemon
-} from "../../../../../models/mongo-models/bot-v2"
-import { PkmWithCustom, Role } from "../../../../../types"
-import { PkmIndex } from "../../../../../types/enum/Pokemon"
-import { logger } from "../../../../../utils/logger"
-import { max, min } from "../../../../../utils/number"
-import { useAppDispatch, useAppSelector } from "../../../hooks"
-import { getAvatarString } from "../../../../../utils/avatar"
-import DiscordButton from "../buttons/discord-button"
-import {
   DEFAULT_BOT_STATE,
-  MAX_BOTS_STAGE,
   estimateElo,
   getMaxItemComponents,
   getNbComponentsOnBoard,
+  getNbScarvesOnBoard,
+  getNbToolsOnBoard,
   getPowerEvaluation,
   getPowerScore,
+  MAX_BOTS_STAGE,
   rewriteBotRoundsRequiredto1,
   validateBoard
 } from "../../../../../core/bot-logic"
-import ImportBotModal from "./import-bot-modal"
+import {
+  computeSynergies,
+  getSynergyStep
+} from "../../../../../models/colyseus-models/synergies"
+import {
+  IBot,
+  IDetailledPokemon
+} from "../../../../../models/mongo-models/bot-v2"
+import PokemonFactory from "../../../../../models/pokemon-factory"
+import { PkmWithCustom, Role } from "../../../../../types"
+import { PkmIndex } from "../../../../../types/enum/Pokemon"
+import { Synergy } from "../../../../../types/enum/Synergy"
+import { getAvatarString } from "../../../../../utils/avatar"
+import { logger } from "../../../../../utils/logger"
+import { max, min } from "../../../../../utils/number"
+import { joinLobbyRoom } from "../../../game/lobby-logic"
+import { useAppDispatch, useAppSelector } from "../../../hooks"
+import DiscordButton from "../buttons/discord-button"
 import { Modal } from "../modal/modal"
+import ImportBotModal from "./import-bot-modal"
 import ScoreIndicator from "./score-indicator"
 import TeamBuilder from "./team-builder"
-import { joinLobbyRoom } from "../../../game/lobby-logic"
-import firebase from "firebase/compat/app"
 import "./bot-builder.css"
 
 export default function BotBuilder() {
@@ -39,10 +47,13 @@ export default function BotBuilder() {
   const [queryParams, setQueryParams] = useSearchParams()
   const [currentStage, setStage] = useState<number>(1)
   const [bot, setBot] = useState<IBot>(DEFAULT_BOT_STATE)
-  const [currentModal, setCurrentModal] = useState<"import" | "export" | null>(null)
+  const [currentModal, setCurrentModal] = useState<"import" | "export" | null>(
+    null
+  )
   const [violation, setViolation] = useState<string>()
   const user = useAppSelector((state) => state.network.profile)
-  const isBotManager = user?.role === Role.BOT_MANAGER || user?.role === Role.ADMIN
+  const isBotManager =
+    user?.role === Role.BOT_MANAGER || user?.role === Role.ADMIN
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
@@ -68,10 +79,12 @@ export default function BotBuilder() {
     if (botId && (!bot || bot.id !== botId)) {
       logger.debug(`loading bot ${botId}`)
       // query param but no matching bot data, so we request it
-      fetch(`/bots/${botId}`).then(r => r.json()).then(botData => {
-        setBot(rewriteBotRoundsRequiredto1(structuredClone(botData)))
-        logger.debug(`bot ${botId} imported`)
-      })
+      fetch(`/bots/${botId}`)
+        .then((r) => r.json())
+        .then((botData) => {
+          setBot(rewriteBotRoundsRequiredto1(structuredClone(botData)))
+          logger.debug(`bot ${botId} imported`)
+        })
     }
   }, [queryParams])
 
@@ -130,10 +143,69 @@ export default function BotBuilder() {
     completeBotInfo()
   }
 
+  function saveFile() {
+    // save board to local JSON file
+    const blob = new Blob([JSON.stringify(bot)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "bot.json"
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function loadFile() {
+    // load from local JSON file
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = "application/json"
+    input.addEventListener("change", async (e) => {
+      if (!input.files) return
+      const file = input.files![0]
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        if (!e.target) return
+        try {
+          const data: IBot = JSON.parse(e.target.result as string)
+          if (!data) {
+            throw new Error("Invalid file content")
+          } else {
+            setBot(rewriteBotRoundsRequiredto1(data))
+          }
+        } catch (e) {
+          console.error("Failed to load bot from file:", e)
+          alert("Invalid file")
+        }
+      }
+      reader.readAsText(file)
+    })
+    input.click()
+  }
+
   const board = useMemo(
     () => bot.steps[currentStage]?.board ?? [],
     [bot, currentStage]
   )
+
+  const synergies = useMemo(
+    () =>
+      computeSynergies(
+        board.map((p) => {
+          const pkm = PokemonFactory.createPokemonFromName(p.name, {
+            emotion: p.emotion,
+            shiny: p.shiny
+          })
+          pkm.positionX = p.x
+          pkm.positionY = p.y
+          p.items.forEach((item) => {
+            pkm.items.add(item)
+          })
+          return pkm
+        })
+      ),
+    [board]
+  )
+
   const nbComponentsOnBoard = useMemo(
     () => getNbComponentsOnBoard(board),
     [board]
@@ -141,6 +213,16 @@ export default function BotBuilder() {
   const nbMaxComponentsOnBoard = useMemo(
     () => getMaxItemComponents(currentStage),
     [currentStage]
+  )
+  const nbScarvesOnBoard = useMemo(() => getNbScarvesOnBoard(board), [board])
+  const nbMaxScarvesOnBoard = useMemo(
+    () => getSynergyStep(synergies, Synergy.NORMAL),
+    [board]
+  )
+  const nbToolsOnBoard = useMemo(() => getNbToolsOnBoard(board), [board])
+  const nbMaxToolsOnBoard = useMemo(
+    () => getSynergyStep(synergies, Synergy.ARTIFICIAL),
+    [board]
   )
   const powerScore = useMemo(() => getPowerScore(board), [board])
   const powerEvaluation = useMemo(
@@ -151,7 +233,7 @@ export default function BotBuilder() {
   useEffect(() => {
     setViolation(undefined)
     try {
-      validateBoard(board, currentStage)
+      validateBoard(board, currentStage, synergies)
     } catch (err: any) {
       if (err instanceof Error) {
         setViolation(err.message)
@@ -168,11 +250,20 @@ export default function BotBuilder() {
         <div className="spacer"></div>
         {isBotManager && (
           <button onClick={() => navigate("/bot-admin")} className="bubbly red">
+            <img src="assets/ui/bot.svg" />
             {t("bot_admin")}
           </button>
         )}
+        <button className="bubbly dark" onClick={saveFile}>
+          <img src="assets/ui/save.svg" /> {t("save")}
+        </button>
+        <button className="bubbly dark" onClick={loadFile}>
+          <img src="assets/ui/load.svg" /> {t("load")}
+        </button>
         <button
-          onClick={() => { setCurrentModal("import") }}
+          onClick={() => {
+            setCurrentModal("import")
+          }}
           className="bubbly orange"
         >
           {t("import")}
@@ -186,7 +277,11 @@ export default function BotBuilder() {
         >
           {t("submit")}
         </button>
-        <DiscordButton url={"https://discord.com/channels/737230355039387749/914503292875325461"} />
+        <DiscordButton
+          url={
+            "https://discord.com/channels/737230355039387749/914503292875325461"
+          }
+        />
       </header>
       <div className="step-info my-container">
         <div className="step-control">
@@ -208,6 +303,22 @@ export default function BotBuilder() {
           {t("item_components")}: {nbComponentsOnBoard} /{" "}
           {nbMaxComponentsOnBoard}
         </span>
+        {(nbScarvesOnBoard > 0 || nbMaxScarvesOnBoard > 0) && (
+          <span
+            className={
+              nbScarvesOnBoard > nbMaxScarvesOnBoard ? "invalid" : "valid"
+            }
+          >
+            {t("scarves")}: {nbScarvesOnBoard} / {nbMaxScarvesOnBoard}
+          </span>
+        )}
+        {(nbToolsOnBoard > 0 || nbMaxToolsOnBoard > 0) && (
+          <span
+            className={nbToolsOnBoard > nbMaxToolsOnBoard ? "invalid" : "valid"}
+          >
+            {t("tools")}: {nbToolsOnBoard} / {nbMaxToolsOnBoard}
+          </span>
+        )}
         <span>
           {t("board_power")}: {powerScore}
         </span>
@@ -226,19 +337,22 @@ export default function BotBuilder() {
       <ImportBotModal
         visible={currentModal === "import"}
         bot={bot}
-        hideModal={() => { setCurrentModal(null) }}
+        hideModal={() => {
+          setCurrentModal(null)
+        }}
         importBot={importBot}
       />
 
       <SubmitBotModal
         visible={currentModal === "export"}
         bot={bot}
-        hideModal={() => { setCurrentModal(null) }}
+        hideModal={() => {
+          setCurrentModal(null)
+        }}
       />
     </div>
   )
 }
-
 
 export function SubmitBotModal(props: {
   bot: IBot
@@ -262,7 +376,7 @@ export function SubmitBotModal(props: {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(props.bot)
       })
@@ -271,7 +385,7 @@ export function SubmitBotModal(props: {
       } else {
         setError(res.statusText)
       }
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message)
     }
     setLoading(false)
@@ -283,18 +397,25 @@ export function SubmitBotModal(props: {
       onClose={props.hideModal}
       className="bot-export-modal"
       header={t("submit_your_bot")}
-      body={<>
-        <p>{t("bot_ready_submission")}</p>
-      </>}
-      footer={<>
-        {!success && !loading && !error && <button className="bubbly green" onClick={submitBot}>
-          {t("submit_your_bot")}
-        </button>}
-        {loading && <p>{t("loading")}</p>}
-        {!loading && error && <p className="error">{t("bot_submission_failed", { error })}</p>}
-        {success && <p>{t("bot_submitted_success")}</p>}
-      </>}
+      body={
+        <>
+          <p>{t("bot_ready_submission")}</p>
+        </>
+      }
+      footer={
+        <>
+          {!success && !loading && !error && (
+            <button className="bubbly green" onClick={submitBot}>
+              {t("submit_your_bot")}
+            </button>
+          )}
+          {loading && <p>{t("loading")}</p>}
+          {!loading && error && (
+            <p className="error">{t("bot_submission_failed", { error })}</p>
+          )}
+          {success && <p>{t("bot_submitted_success")}</p>}
+        </>
+      }
     />
   )
 }
-

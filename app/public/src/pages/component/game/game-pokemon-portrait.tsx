@@ -1,52 +1,72 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Tooltip } from "react-tooltip"
+import { RarityColor } from "../../../../../config"
 import { CountEvolutionRule } from "../../../../../core/evolution-rules"
 import { Pokemon } from "../../../../../models/colyseus-models/pokemon"
+import {
+  getPkmWithCustom,
+  PokemonCustoms
+} from "../../../../../models/colyseus-models/pokemon-customs"
 import PokemonFactory from "../../../../../models/pokemon-factory"
 import { getBuyPrice } from "../../../../../models/shop"
-import { RarityColor } from "../../../../../types/Config"
 import { Pkm, PkmFamily } from "../../../../../types/enum/Pokemon"
-import { SpecialGameRule } from "../../../../../types/enum/SpecialGameRule"
-import { selectCurrentPlayer, useAppSelector } from "../../../hooks"
 import { getPortraitSrc } from "../../../../../utils/avatar"
+import { values } from "../../../../../utils/schemas"
+import {
+  selectConnectedPlayer,
+  selectSpectatedPlayer,
+  useAppSelector
+} from "../../../hooks"
+import { getGameScene } from "../../game"
 import { cc } from "../../utils/jsx"
 import { Money } from "../icons/money"
 import SynergyIcon from "../icons/synergy-icon"
 import { GamePokemonDetail } from "./game-pokemon-detail"
-import { usePreference } from "../../../preferences"
-import { getPkmWithCustom } from "../../../../../models/colyseus-models/pokemon-customs"
 import "./game-pokemon-portrait.css"
+
+export function getCachedPortrait(
+  index: string,
+  customs?: PokemonCustoms
+): string {
+  const scene = getGameScene()
+  const pokemonCustom = getPkmWithCustom(index, customs)
+  return (
+    scene?.textures.getBase64(`portrait-${index}`) ??
+    getPortraitSrc(index, pokemonCustom.shiny, pokemonCustom.emotion)
+  )
+}
 
 export default function GamePokemonPortrait(props: {
   index: number
-  origin: string
+  origin: "wiki" | "shop" | "proposition" | "team" | "planner" | "battle"
   pokemon: Pokemon | Pkm | undefined
   click?: React.MouseEventHandler<HTMLDivElement>
   onMouseEnter?: React.MouseEventHandler<HTMLDivElement>
-  onMouseLeave?: React.MouseEventHandler<HTMLDivElement>,
+  onMouseLeave?: React.MouseEventHandler<HTMLDivElement>
   inPlanner?: boolean
 }) {
-  const [antialiasing] = usePreference("antialiasing")
-  const pokemon = useMemo(
-    () =>
-      typeof props.pokemon === "string"
-        ? PokemonFactory.createPokemonFromName(props.pokemon)
-        : props.pokemon,
-    [props.pokemon]
-  )
+  const pokemon = useMemo(() => {
+    if (typeof props.pokemon === "string") {
+      const pokemon = PokemonFactory.createPokemonFromName(props.pokemon)
+      pokemon.pp = pokemon.maxPP
+      return pokemon
+    }
+    return props.pokemon
+  }, [props.pokemon])
 
-  const uid: string = useAppSelector((state) => state.network.uid)
-  const currentPlayerId: string = useAppSelector(
-    (state) => state.game.currentPlayerId
+  const currentPlayerUid: string = useAppSelector((state) => state.network.uid)
+  const spectatedPlayerId: string = useAppSelector(
+    (state) => state.game.playerIdSpectated
   )
-  const currentPlayer = useAppSelector(selectCurrentPlayer)
+  const spectatedPlayer = useAppSelector(selectSpectatedPlayer)
+  const connectedPlayer = useAppSelector(selectConnectedPlayer)
 
-  const board = useAppSelector(
-    (state) => state.game.players.find((p) => p.id === uid)?.board
-  )
+  const board = connectedPlayer?.board ?? null
+
   const specialGameRule = useAppSelector((state) => state.game.specialGameRule)
+  const stageLevel = useAppSelector((state) => state.game.stageLevel)
 
-  const isOnAnotherBoard = currentPlayerId !== uid
+  const isOnAnotherBoard = spectatedPlayerId !== currentPlayerUid
 
   const [count, setCount] = useState(0)
   const [countEvol, setCountEvol] = useState(0)
@@ -66,9 +86,7 @@ export default function GamePokemonPortrait(props: {
       board.forEach((p) => {
         if (p.name === pokemon.name) {
           _count++
-        } else if (
-          PkmFamily[p.name] === pokemon.name
-        ) {
+        } else if (PkmFamily[p.name] === pokemon.name) {
           _countEvol++
         }
       })
@@ -82,12 +100,13 @@ export default function GamePokemonPortrait(props: {
     return <div className="game-pokemon-portrait my-box empty" />
   }
 
-  const pokemonCustom = getPkmWithCustom(pokemon.index, currentPlayer?.pokemonCustoms)
+  const customs = spectatedPlayer?.pokemonCustoms
+  const pokemonCustom = getPkmWithCustom(pokemon.index, customs)
   const rarityColor = RarityColor[pokemon.rarity]
 
-  const evolutionName = currentPlayer
-    ? pokemon.evolutionRule.getEvolution(pokemon, currentPlayer)
-    : pokemon.evolutions[0] ?? pokemon.evolution
+  const evolutionName = spectatedPlayer
+    ? pokemon.evolutionRule.getEvolution(pokemon, spectatedPlayer)
+    : (pokemon.evolutions[0] ?? pokemon.evolution)
   let pokemonEvolution = PokemonFactory.createPokemonFromName(evolutionName)
 
   const willEvolve =
@@ -105,28 +124,35 @@ export default function GamePokemonPortrait(props: {
     countEvol === pokemon.evolutionRule.numberRequired - 1 &&
     pokemonEvolution.hasEvolution
   ) {
-    const evolutionName2 = currentPlayer
-      ? pokemonEvolution.evolutionRule.getEvolution(pokemonEvolution, currentPlayer)
-      : pokemonEvolution.evolutions[0] ?? pokemonEvolution.evolution
+    const evolutionName2 = spectatedPlayer
+      ? pokemonEvolution.evolutionRule.getEvolution(
+          pokemonEvolution,
+          spectatedPlayer,
+          stageLevel
+        )
+      : (pokemonEvolution.evolutions[0] ?? pokemonEvolution.evolution)
     pokemonEvolution = PokemonFactory.createPokemonFromName(evolutionName2)
   }
 
   const pokemonInPortrait =
-    willEvolve && pokemonEvolution
-      ? pokemonEvolution
-      : pokemon
+    willEvolve && pokemonEvolution ? pokemonEvolution : pokemon
 
-  let cost = getBuyPrice(pokemon.name, specialGameRule)
+  const cost = getBuyPrice(pokemon.name, specialGameRule)
 
-  if (
-    willEvolve &&
-    pokemonEvolution &&
-    specialGameRule === SpecialGameRule.BUYER_FEVER
-  ) {
-    cost = 0
-  }
+  const gainedSynergies =
+    pokemonEvolution && willEvolve
+      ? values(pokemonEvolution.types).filter(
+          (type) => !pokemon.types.has(type)
+        )
+      : []
+  const lostSynergies =
+    pokemonEvolution && willEvolve
+      ? values(pokemon.types).filter(
+          (type) => !pokemonEvolution.types.has(type)
+        )
+      : []
 
-  const canBuy = currentPlayer?.alive && currentPlayer?.money >= cost
+  const canBuy = spectatedPlayer?.alive && spectatedPlayer?.money >= cost
 
   return (
     <div
@@ -138,11 +164,7 @@ export default function GamePokemonPortrait(props: {
       style={{
         backgroundColor: rarityColor,
         borderColor: rarityColor,
-        backgroundImage: `url("${getPortraitSrc(
-          pokemonInPortrait.index,
-          pokemonCustom.shiny,
-          pokemonCustom.emotion
-        )}")`
+        backgroundImage: `url("${getCachedPortrait(pokemonInPortrait.index, customs)}")`
       }}
       onClick={(e) => {
         if (canBuy && props.click) props.click(e)
@@ -161,16 +183,13 @@ export default function GamePokemonPortrait(props: {
           pokemon={pokemonInPortrait}
           emotion={pokemonCustom.emotion}
           shiny={pokemonCustom.shiny}
+          origin={props.origin}
         />
       </Tooltip>
       {willEvolve && pokemonEvolution && (
         <div className="game-pokemon-portrait-evolution">
           <img
-            src={getPortraitSrc(
-              pokemon.index,
-              pokemonCustom.shiny,
-              pokemonCustom.emotion
-            )}
+            src={getCachedPortrait(pokemon.index, customs)}
             className="game-pokemon-portrait-evolution-portrait"
           />
           <img
@@ -195,11 +214,19 @@ export default function GamePokemonPortrait(props: {
       <ul className="game-pokemon-portrait-types">
         {Array.from(pokemonInPortrait.types.values()).map((type) => {
           return (
-            <li key={type}>
+            <li
+              key={type}
+              className={cc({ gained: gainedSynergies.includes(type) })}
+            >
               <SynergyIcon type={type} />
             </li>
           )
         })}
+        {lostSynergies.map((type) => (
+          <li key={type} className="lost">
+            <SynergyIcon type={type} />
+          </li>
+        ))}
       </ul>
     </div>
   )

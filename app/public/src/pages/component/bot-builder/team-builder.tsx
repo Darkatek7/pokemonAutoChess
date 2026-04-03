@@ -1,25 +1,26 @@
 import React, { useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
+import { useLocation } from "react-router-dom"
 import { computeSynergies } from "../../../../../models/colyseus-models/synergies"
 import {
   IBot,
   IDetailledPokemon
 } from "../../../../../models/mongo-models/bot-v2"
 import PokemonFactory from "../../../../../models/pokemon-factory"
-import { Emotion, PkmWithCustom } from "../../../../../types"
+import { Emotion, PkmWithCustom, Role, Transfer } from "../../../../../types"
 import { Item } from "../../../../../types/enum/Item"
 import { Pkm } from "../../../../../types/enum/Pokemon"
 import { Synergy } from "../../../../../types/enum/Synergy"
+import { isOnBench } from "../../../../../utils/board"
+import { values } from "../../../../../utils/schemas"
+import { selectSpectatedPlayer, useAppSelector } from "../../../hooks"
+import { rooms } from "../../../network"
 import Synergies from "../synergy/synergies"
 import BotAvatar from "./bot-avatar"
 import ItemPicker from "./item-picker"
 import PokemonPicker from "./pokemon-picker"
 import SelectedEntity from "./selected-entity"
 import TeamEditor from "./team-editor"
-import { useTranslation } from "react-i18next"
-import { useLocation } from "react-router-dom"
-import { selectCurrentPlayer, useAppSelector } from "../../../hooks"
-import { values } from "../../../../../utils/schemas"
-import { isOnBench } from "../../../../../utils/board"
 import "./team-builder.css"
 
 export default function TeamBuilder(props: {
@@ -37,9 +38,12 @@ export default function TeamBuilder(props: {
   })
 
   const ingame = useLocation().pathname === "/game"
-  const currentPlayer = useAppSelector(selectCurrentPlayer)
+  const inBotBuilder = useLocation().pathname.startsWith("/bot-builder")
+  const spectatedPlayer = useAppSelector(selectSpectatedPlayer)
   const [board, setBoard] = useState<IDetailledPokemon[]>(props.board ?? [])
-
+  const isAdmin = useAppSelector(
+    (state) => state.network.profile?.role === Role.ADMIN
+  )
 
   useEffect(() => {
     if (props.board) setBoard(props.board) // keep local state in sync with parent prop
@@ -131,11 +135,11 @@ export default function TeamBuilder(props: {
   }
 
   function handleDrop(x: number, y: number, e: React.DragEvent) {
-    if (e.dataTransfer.getData("cell") != "") {
-      const [originX, originY] = e.dataTransfer
-        .getData("cell")
-        .split(",")
-        .map(Number)
+    e.stopPropagation()
+    e.preventDefault()
+    const data = e.dataTransfer.getData("text/plain")
+    if (data.startsWith("cell")) {
+      const [type, originX, originY] = data.split(",").map(Number)
       const pkm = board.find((p) => p.x === originX && p.y === originY)
       const otherPokemonOnCell = board.find((p) => p.x === x && p.y === y)
       if (pkm) {
@@ -147,25 +151,26 @@ export default function TeamBuilder(props: {
         pkm.y = y
         updateBoard([...board])
       }
-    } else if (e.dataTransfer.getData("pokemon") != "") {
+    } else if (data.startsWith("pokemon")) {
+      const [type, name] = data.split(",") as [string, Pkm]
       const pkm: PkmWithCustom = {
-        name: e.dataTransfer.getData("pokemon") as Pkm,
+        name,
         emotion: Emotion.NORMAL,
         shiny: false
       }
       addPokemon(x, y, pkm)
       setSelection(pkm)
-    } else if (e.dataTransfer.getData("item") != "") {
-      const item = e.dataTransfer.getData("item") as Item
+    } else if (data.startsWith("item")) {
+      const [type, item] = data.split(",") as [string, Item]
       addItem(x, y, item)
       setSelection(item)
     }
   }
 
   function getFirstEmptyCell(): { x: number; y: number } | null {
-    for (let y = 1; y < 3; y++) {
+    for (let y = 1; y <= 3; y++) {
       for (let x = 0; x < 8; x++) {
-        if (board.find(p => p.x === x && p.y === y) === undefined) {
+        if (board.find((p) => p.x === x && p.y === y) === undefined) {
           return { x, y }
         }
       }
@@ -201,17 +206,21 @@ export default function TeamBuilder(props: {
 
   function snapshot() {
     try {
-      if (!currentPlayer) return;
-      updateBoard(values(currentPlayer.board).filter(pokemon => !isOnBench(pokemon)).map(p => {
-        return {
-          name: p.name,
-          emotion: p.emotion,
-          shiny: p.shiny,
-          items: values(p.items),
-          x: p.positionX,
-          y: p.positionY
-        }
-      }))
+      if (!spectatedPlayer) return
+      updateBoard(
+        values(spectatedPlayer.board)
+          .filter((pokemon) => !isOnBench(pokemon))
+          .map((p) => {
+            return {
+              name: p.name,
+              emotion: p.emotion,
+              shiny: p.shiny,
+              items: values(p.items),
+              x: p.positionX,
+              y: p.positionY
+            }
+          })
+      )
     } catch (e) {
       console.error("Failed to snapshot board:", e)
     }
@@ -222,7 +231,7 @@ export default function TeamBuilder(props: {
   }
 
   function saveFile() {
-    // save board to local JSON file    
+    // save board to local JSON file
     const blob = new Blob([JSON.stringify(board)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -243,11 +252,15 @@ export default function TeamBuilder(props: {
       const reader = new FileReader()
       reader.onload = async (e) => {
         if (!e.target) return
-        const data = JSON.parse(e.target.result as string)
-        if (data.length == 0) {
+        try {
+          const data = JSON.parse(e.target.result as string)
+          if (!data || !Array.isArray(data)) {
+            throw new Error("Invalid file content")
+          } else {
+            updateBoard(data)
+          }
+        } catch (e) {
           alert("Invalid file")
-        } else {
-          updateBoard(data)
         }
       }
       reader.readAsText(file)
@@ -255,23 +268,56 @@ export default function TeamBuilder(props: {
     input.click()
   }
 
+  function overwriteBoard() {
+    rooms.game?.send(Transfer.OVERWRITE_BOARD, board)
+  }
+
   return (
     <div id="team-builder">
-      <Synergies synergies={synergies} tooltipPortal={false} />
+      <div className="synergies-container my-box">
+        <Synergies synergies={synergies} tooltipPortal={false} />
+      </div>
       <div className="actions">
-        {ingame && <button className="bubbly blue" onClick={snapshot}><img src="assets/ui/photo.svg" /> {t("snapshot")}</button>}
-        <button className="bubbly dark" onClick={saveFile}><img src="assets/ui/save.svg" /> {t("save")}</button>
-        <button className="bubbly dark" onClick={loadFile}><img src="assets/ui/load.svg" /> {t("load")}</button>
-        <button className="bubbly red" onClick={reset}><img src="assets/ui/trash.svg" /> {t("reset")}</button>
+        {ingame && isAdmin && (
+          <details>
+            <summary>Admin</summary>
+            <button className="bubbly blue" onClick={overwriteBoard}>
+              Overwrite game board
+            </button>
+          </details>
+        )}
+        {ingame && (
+          <button className="bubbly blue" onClick={snapshot}>
+            <img src="assets/ui/photo.svg" /> {t("snapshot")}
+          </button>
+        )}
+        {!inBotBuilder && (
+          <button className="bubbly dark" onClick={saveFile}>
+            <img src="assets/ui/save.svg" /> {t("save")}
+          </button>
+        )}
+        {!inBotBuilder && (
+          <button className="bubbly dark" onClick={loadFile}>
+            <img src="assets/ui/load.svg" /> {t("load")}
+          </button>
+        )}
+        <button className="bubbly red" onClick={reset}>
+          <img src="assets/ui/trash.svg" /> {t("reset")}
+        </button>
       </div>
       <TeamEditor
         board={board}
         handleEditorClick={handleEditorClick}
         handleDrop={handleDrop}
+        showBench={inBotBuilder}
       />
       <SelectedEntity entity={selection} onChange={updateSelectedPokemon} />
       <ItemPicker selectEntity={setSelection} selected={selection} />
-      <PokemonPicker selectEntity={e => setSelection(e as PkmWithCustom | Item)} addEntity={addPokemonOnFirstEmptyCell} selected={selection} />
+      <PokemonPicker
+        selectEntity={(e) => setSelection(e as PkmWithCustom | Item)}
+        addEntity={addPokemonOnFirstEmptyCell}
+        selected={selection}
+      />
       {props.bot && props.onChangeAvatar && (
         <BotAvatar
           bot={props.bot}

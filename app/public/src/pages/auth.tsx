@@ -1,15 +1,15 @@
 import React from "react"
 import { useTranslation } from "react-i18next"
 import pkg from "../../../../package.json"
-import Wiki from "./component/wiki/wiki"
-import { Modal } from "./component/modal/modal"
-import DiscordButton from "./component/buttons/discord-button"
-import GithubButton from "./component/buttons/github-button"
-import PolicyButton from "./component/buttons/policy-button"
 import { useAppDispatch, useAppSelector } from "../hooks"
 import { setErrorAlertMessage } from "../stores/NetworkStore"
 import Login from "./component/auth/login"
+import DiscordButton from "./component/buttons/discord-button"
+import GithubButton from "./component/buttons/github-button"
+import PolicyButton from "./component/buttons/policy-button"
+import { Modal } from "./component/modal/modal"
 import ServersList from "./component/servers/servers-list"
+import Wiki from "./component/wiki/wiki"
 import "./auth.css"
 
 export default function Auth() {
@@ -19,7 +19,7 @@ export default function Auth() {
     window.matchMedia("(orientation: portrait)").matches
   const [modal, setModal] = React.useState<string | null>(null)
   const dispatch = useAppDispatch()
-  const networkError = useAppSelector(state => state.network.error)
+  const networkError = useAppSelector((state) => state.network.error)
   const discordUrl = process.env.DISCORD_SERVER
 
   return (
@@ -62,14 +62,16 @@ export default function Auth() {
         onClose={() => setModal(null)}
         show={modal === "wiki"}
         className="wiki-modal"
-        header={t("wiki_label")}>
+        header={t("wiki_label")}
+      >
         <Wiki inGame={false} />
       </Modal>
       <Modal
         onClose={() => setModal(null)}
         show={modal === "servers"}
         className="servers-modal"
-        header={t("community_servers")}>
+        header={t("community_servers")}
+      >
         <ServersList />
       </Modal>
       <Modal

@@ -1,0 +1,356 @@
+import { HydratedDocument } from "mongoose"
+import {
+  BoosterRarityProbability,
+  EmotionCost,
+  getBaseAltForm,
+  PkmAltForms,
+  PkmAltFormsByPkm
+} from "../config"
+import { getAvailableEmotions } from "../models/precomputed/precomputed-emotions"
+import { getPokemonData } from "../models/precomputed/precomputed-pokemon-data"
+import { PRECOMPUTED_POKEMONS_PER_RARITY } from "../models/precomputed/precomputed-rarity"
+import { PokemonAnimations } from "../public/src/game/components/pokemon-animations"
+import { CollectionEmotions, Emotion, PkmWithCustom } from "../types"
+import { Booster, BoosterCard } from "../types/Booster"
+import { Ability } from "../types/enum/Ability"
+import { Rarity } from "../types/enum/Game"
+import { Pkm, PkmByIndex, PkmIndex, Unowns } from "../types/enum/Pokemon"
+import {
+  IPokemonCollectionItemClient,
+  IPokemonCollectionItemMongo,
+  IPokemonCollectionItemUnpacked,
+  IUserMetadataMongo
+} from "../types/interfaces/UserMetadata"
+import { logger } from "../utils/logger"
+import { chance, pickRandomIn, randomWeighted } from "../utils/random"
+
+export function createBooster(user: IUserMetadataMongo): Booster {
+  const NB_PER_BOOSTER = 10
+  const boosterContent: BoosterCard[] = []
+  const alreadyTaken = new Set<string>()
+  const godPack = chance(1 / 1000)
+
+  for (let i = 0; i < NB_PER_BOOSTER; i++) {
+    const guaranteedUnique = i === NB_PER_BOOSTER - 1
+    let card: BoosterCard
+    let attempts = 0
+    const maxAttempts = 50 // Prevent infinite loops
+
+    do {
+      card = pickRandomPokemonBooster(user, guaranteedUnique, godPack)
+      attempts++
+    } while (
+      attempts < maxAttempts &&
+      alreadyTaken.has(`${card.name}-${card.shiny}-${card.emotion}`)
+    )
+
+    // If we couldn't find a unique combination after maxAttempts, use the last generated card anyway
+    // This ensures the booster always has the expected number of cards
+    boosterContent.push(card)
+    alreadyTaken.add(`${card.name}-${card.shiny}-${card.emotion}`)
+  }
+  return boosterContent
+}
+
+export function pickRandomPokemonBooster(
+  user: IUserMetadataMongo,
+  guaranteedUnique: boolean,
+  godPack: boolean
+): BoosterCard {
+  let name = Pkm.MAGIKARP
+  const rarity =
+    randomWeighted<Rarity>(BoosterRarityProbability) ?? Rarity.COMMON
+
+  if (godPack || guaranteedUnique) {
+    name = pickRandomIn(
+      [
+        ...PRECOMPUTED_POKEMONS_PER_RARITY[Rarity.UNIQUE],
+        ...PRECOMPUTED_POKEMONS_PER_RARITY[Rarity.LEGENDARY]
+      ].filter((p) => getBaseAltForm(p) === p)
+    ) as Pkm
+  } else {
+    const candidates: Pkm[] = (
+      PRECOMPUTED_POKEMONS_PER_RARITY[rarity] ?? []
+    ).filter(
+      (p) =>
+        Unowns.includes(p) === false &&
+        getPokemonData(p).skill !== Ability.DEFAULT &&
+        getBaseAltForm(p) === p
+    )
+    name = pickRandomIn(candidates)
+    if (name === undefined) {
+      name = Pkm.MAGIKARP
+      logger.warn(
+        `No candidates found for booster card rarity ${rarity}, defaulting to MAGIKARP`
+      )
+    }
+  }
+
+  if (name in PkmAltFormsByPkm) {
+    // If the selected Pokemon has alt forms, pick one of them randomly
+    name = pickRandomIn([name, ...PkmAltFormsByPkm[name]!])
+  }
+
+  const shiny =
+    (godPack || chance(0.05)) &&
+    PokemonAnimations[name]?.shinyUnavailable !== true
+
+  const availableEmotions = getAvailableEmotions(PkmIndex[name], shiny)
+  let emotion =
+    randomWeighted<Emotion>(
+      availableEmotions.reduce(
+        (o, e) => ({ ...o, [e]: 1 / EmotionCost[e] }),
+        {}
+      )
+    ) ?? Emotion.NORMAL
+
+  if (godPack) {
+    const emotionsNotUnlocked = availableEmotions.filter(
+      (emotion) =>
+        !CollectionUtils.hasUnlockedCustom(user.pokemonCollection, {
+          name,
+          shiny,
+          emotion
+        })
+    )
+    if (emotionsNotUnlocked.length > 0) {
+      emotion = pickRandomIn(emotionsNotUnlocked)
+    }
+  }
+
+  const hasAlreadyUnlocked = CollectionUtils.hasUnlockedCustom(
+    user.pokemonCollection,
+    {
+      name,
+      shiny,
+      emotion
+    }
+  )
+
+  return { name, shiny, emotion, new: !hasAlreadyUnlocked }
+}
+
+// Utility functions for working with collection and the optimized unlocked field
+export class CollectionUtils {
+  private static readonly EMOTION_VALUES = CollectionEmotions
+
+  static hasUnlockedCustom(
+    collection: Map<string, IPokemonCollectionItemMongo>,
+    card: PkmWithCustom
+  ): boolean {
+    const index = PkmIndex[card.name]
+    if (collection.has(index) === false) {
+      return false
+    }
+    const collectionItem = collection.get(index)!
+    return CollectionUtils.hasUnlocked(
+      collectionItem.unlocked,
+      card.emotion ?? Emotion.NORMAL,
+      card.shiny
+    )
+  }
+
+  static toMongoCollectionItem(
+    item: IPokemonCollectionItemClient
+  ): IPokemonCollectionItemMongo {
+    return {
+      ...item,
+      unlocked: CollectionUtils.decodeBase64(item.unlockedb64)
+    }
+  }
+
+  static toCollectionItemClient(
+    item: IPokemonCollectionItemMongo
+  ): IPokemonCollectionItemClient {
+    return {
+      id: item.id,
+      dust: item.dust,
+      played: item.played,
+      selectedShiny: item.selectedShiny,
+      selectedEmotion: item.selectedEmotion,
+      unlockedb64: item.unlocked
+        ? CollectionUtils.encodeBase64(item.unlocked)
+        : ""
+    }
+  }
+
+  static unpackCollectionItem(
+    item: IPokemonCollectionItemClient
+  ): IPokemonCollectionItemUnpacked {
+    const { emotions, shinyEmotions } =
+      CollectionUtils.getEmotionsUnlocked(item)
+    const { unlockedb64, ...rest } = item
+    return {
+      ...rest,
+      emotions,
+      shinyEmotions
+    }
+  }
+
+  /**
+   * Create emotion mask from legacy format
+   */
+  static getEmotionMask(
+    emotions: Emotion[] = [],
+    shinyEmotions: Emotion[] = []
+  ): Buffer {
+    const buffer = Buffer.alloc(5) // 5 bytes = 40 bits total
+
+    // Set normal emotions (using bits 0-19)
+    emotions.forEach((emotion) => {
+      const index = this.EMOTION_VALUES.indexOf(emotion)
+      if (index !== -1) {
+        this.setBit(buffer, index, true)
+      }
+    })
+
+    // Set shiny emotions (using bits 20-39)
+    shinyEmotions.forEach((emotion) => {
+      const index = this.EMOTION_VALUES.indexOf(emotion)
+      if (index !== -1) {
+        this.setBit(buffer, index + 20, true)
+      }
+    })
+
+    return buffer
+  }
+
+  static encodeBase64(buffer: Buffer): string {
+    return buffer.toString("base64")
+  }
+
+  static decodeBase64(base64: string): Buffer {
+    return Buffer.from(base64, "base64")
+  }
+
+  /**
+   * Get list of emotions from emotion 5 bytes mask on MongoDB
+   */
+  static getEmotionsUnlocked(
+    item?: IPokemonCollectionItemMongo | IPokemonCollectionItemClient
+  ): {
+    emotions: Emotion[]
+    shinyEmotions: Emotion[]
+  } {
+    const emotions: Emotion[] = []
+    const shinyEmotions: Emotion[] = []
+
+    if (!item) return { emotions, shinyEmotions }
+
+    const mask =
+      "unlockedb64" in item
+        ? CollectionUtils.decodeBase64(item.unlockedb64)
+        : item.unlocked
+
+    // Extract normal emotions (bits 0-19)
+    for (let i = 0; i < 20; i++) {
+      if (this.getBit(mask, i)) {
+        emotions.push(this.EMOTION_VALUES[i])
+      }
+    }
+
+    // Extract shiny emotions (bits 20-39)
+    for (let i = 0; i < 20; i++) {
+      if (this.getBit(mask, i + 20)) {
+        shinyEmotions.push(this.EMOTION_VALUES[i])
+      }
+    }
+
+    return {
+      emotions,
+      shinyEmotions
+    }
+  }
+
+  /**
+   * Check if emotion is unlocked
+   */
+  static hasUnlocked(
+    mask: Buffer,
+    emotion: Emotion,
+    shiny: boolean = false
+  ): boolean {
+    const index = this.EMOTION_VALUES.indexOf(emotion)
+    if (index === -1) return false
+
+    const bitIndex = shiny ? index + 20 : index
+    return this.getBit(mask, bitIndex)
+  }
+
+  /**
+   * Add emotion to the mask
+   */
+  static unlockEmotion(
+    mask: Buffer,
+    emotion: Emotion,
+    shiny: boolean = false
+  ): void {
+    const index = this.EMOTION_VALUES.indexOf(emotion)
+    if (index === -1) return
+
+    const bitIndex = shiny ? index + 20 : index
+    this.setBit(mask, bitIndex, true)
+  }
+
+  private static setBit(mask: Buffer, bitIndex: number, value: boolean): void {
+    const byteIndex = Math.floor(bitIndex / 8)
+    const bitPosition = bitIndex % 8
+
+    if (byteIndex >= mask.length) return
+
+    if (value) {
+      mask[byteIndex] |= 1 << bitPosition
+    } else {
+      mask[byteIndex] &= ~(1 << bitPosition)
+    }
+  }
+
+  private static getBit(mask: Buffer, bitIndex: number): boolean {
+    const byteIndex = Math.floor(bitIndex / 8)
+    const bitPosition = bitIndex % 8
+
+    if (byteIndex >= mask.length) return false
+
+    return (mask[byteIndex] & (1 << bitPosition)) !== 0
+  }
+}
+
+export async function migrateShardsOfAltForms(
+  mongoUser: HydratedDocument<IUserMetadataMongo>
+) {
+  let modified = false
+
+  for (const [index, item] of mongoUser.pokemonCollection) {
+    const pkm = PkmByIndex[index]
+    if (PkmAltForms.includes(pkm) && item.dust > 0) {
+      const basePkm = getBaseAltForm(pkm)
+      const baseIndex = PkmIndex[basePkm]
+      const baseItem = mongoUser.pokemonCollection.get(baseIndex)
+      const dustToMigrate = item.dust
+      if (!baseItem) {
+        // Base form is not in collection, create new collection item
+        const newCollectionItem: IPokemonCollectionItemMongo = {
+          id: index,
+          unlocked: Buffer.alloc(5, 0),
+          dust: item.dust,
+          selectedEmotion: Emotion.NORMAL,
+          selectedShiny: false,
+          played: 0
+        }
+        mongoUser.pokemonCollection.set(baseIndex, newCollectionItem)
+      } else {
+        // Base form exists, add dust
+        baseItem.dust += dustToMigrate
+        item.dust = 0
+      }
+      logger.info(
+        `Migrated ${dustToMigrate} shards from ${pkm} to its base form ${basePkm} for user ${mongoUser.uid}`
+      )
+      modified = true
+    }
+  }
+
+  if (modified) {
+    return await mongoUser.save()
+  }
+}

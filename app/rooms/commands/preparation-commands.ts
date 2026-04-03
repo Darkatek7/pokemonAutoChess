@@ -4,17 +4,22 @@ import { Command } from "@colyseus/command"
 import { Client, matchMaker } from "colyseus"
 import { UserRecord } from "firebase-admin/lib/auth/user-record"
 import { FilterQuery } from "mongoose"
+import {
+  EloRankThreshold,
+  MAX_PLAYERS_PER_GAME,
+  MIN_HUMAN_PLAYERS
+} from "../../config"
+import {
+  getPendingGame,
+  isPlayerTimeout,
+  setPendingGame
+} from "../../core/pending-game-manager"
 import { GameUser, IGameUser } from "../../models/colyseus-models/game-user"
 import { BotV2, IBot } from "../../models/mongo-models/bot-v2"
 import UserMetadata from "../../models/mongo-models/user-metadata"
 import { Role } from "../../types"
-import {
-  EloRank,
-  EloRankThreshold,
-  MAX_PLAYERS_PER_GAME,
-  MIN_HUMAN_PLAYERS
-} from "../../types/Config"
 import { CloseCodes } from "../../types/enum/CloseCodes"
+import { EloRank } from "../../types/enum/EloRank"
 import { BotDifficulty, GameMode } from "../../types/enum/Game"
 import { SpecialGameRule } from "../../types/enum/SpecialGameRule"
 import { getRank } from "../../utils/elo"
@@ -28,30 +33,23 @@ import PreparationRoom from "../preparation-room"
 export class OnJoinCommand extends Command<
   PreparationRoom,
   {
-    client: Client<undefined, UserRecord>
+    client: Client<{ auth: UserRecord }>
     options: any
     auth: UserRecord
   }
 > {
   async execute({ client, options, auth }) {
     try {
-      const timeoutDateStr = await this.room.presence.hget(
-        client.auth.uid,
-        "user_timeout"
-      )
-      if (timeoutDateStr) {
-        const timeout = new Date(timeoutDateStr).getTime()
-        if (timeout > Date.now()) {
-          client.leave(CloseCodes.USER_TIMEOUT)
-          return
-        }
+      if (await isPlayerTimeout(this.room.presence, client.auth.uid)) {
+        client.leave(CloseCodes.USER_TIMEOUT)
+        return
       }
 
-      const pendingGameId = await this.room.presence.hget(
-        client.auth.uid,
-        "pending_game_id"
+      const pendingGame = await getPendingGame(
+        this.room.presence,
+        client.auth.uid
       )
-      if (pendingGameId != null) {
+      if (pendingGame != null && !pendingGame.isExpired) {
         client.leave(CloseCodes.USER_IN_ANOTHER_GAME)
         return
       }
@@ -112,6 +110,7 @@ export class OnJoinCommand extends Command<
             u.uid,
             u.displayName,
             u.elo,
+            u.games,
             u.avatar,
             false,
             false,
@@ -270,6 +269,7 @@ export class OnGameStartRequestCommand extends Command<
       } else {
         this.state.gameStartedAt = new Date().toISOString()
         this.room.lock()
+        this.room.autoDispose = true // re-enable auto dispose for tournament games
         const gameRoom = await matchMaker.createRoom("game", {
           users: Object.fromEntries(entries(this.state.users)),
           name: this.state.name,
@@ -284,7 +284,7 @@ export class OnGameStartRequestCommand extends Command<
         })
 
         this.state.users.forEach((user) => {
-          this.room.presence.hset(user.uid, "pending_game_id", gameRoom.roomId)
+          setPendingGame(this.room.presence, user.uid, gameRoom.roomId)
         })
 
         this.room.presence.publish("game-started", {
@@ -425,9 +425,15 @@ export class OnRoomChangeSpecialRule extends Command<
     specialRule: SpecialGameRule | null
   }
 > {
-  execute({ client, specialRule }) {
+  async execute({ client, specialRule }) {
     try {
-      if (client.auth?.uid == this.state.ownerId) {
+      const u = await UserMetadata.findOne({ uid: client.auth?.uid })
+      if (!u) {
+        client.leave(CloseCodes.USER_NOT_AUTHENTICATED)
+        return
+      }
+
+      if (client.auth?.uid == this.state.ownerId && u.role === Role.ADMIN) {
         this.state.specialGameRule = specialRule
         if (specialRule != null) {
           this.state.noElo = true
@@ -437,9 +443,9 @@ export class OnRoomChangeSpecialRule extends Command<
         this.room.state.addMessage({
           author: "Server",
           authorId: "server",
-          payload: `Room leader ${
+          payload: `Smeargle's Scribble mode has been ${
             specialRule ? "enabled" : "disabled"
-          } Smeargle's Scribble for this game. Players need to ready again.`,
+          } for this game. Players need to ready again.`,
           avatar: leader?.avatar
         })
 
@@ -475,9 +481,9 @@ export class OnChangeNoEloCommand extends Command<
         this.room.state.addMessage({
           author: "Server",
           authorId: "server",
-          payload: `Room leader ${
+          payload: `Elo gain has been ${
             noElo ? "disabled" : "enabled"
-          } ELO gain for this game. Players need to ready again.`,
+          } for this game. Players need to ready again.`,
           avatar: leader?.avatar
         })
 
@@ -593,7 +599,7 @@ export class OnToggleReadyCommand extends Command<
 > {
   execute({ client, ready }) {
     try {
-      // cannot toggle ready in quick play / ranked / tournament game mode
+      // cannot toggle ready in classic / ranked / tournament game mode
       if (this.room.state.gameMode !== GameMode.CUSTOM_LOBBY && ready !== true)
         return
 
@@ -687,6 +693,7 @@ export class InitializeBotsCommand extends Command<
                 bot.id,
                 bot.name,
                 bot.elo,
+                99, // arbitrary number of games played
                 bot.avatar,
                 true,
                 true,
@@ -785,6 +792,7 @@ export class OnAddBotCommand extends Command<PreparationRoom, OnAddBotPayload> {
             bot.id,
             bot.name,
             bot.elo,
+            99, // arbitrary number of games played
             bot.avatar,
             true,
             true,

@@ -1,12 +1,13 @@
 import { GameObjects } from "phaser"
-import { DEPTH } from "../depths"
 import { Team } from "../../../../types/enum/Game"
+import { max } from "../../../../utils/number"
+import { DEPTH } from "../depths"
 
 export default class LifeBar extends GameObjects.Graphics {
-  maxLife: number
-  life: number
+  maxHp: number
+  hp: number
   shield: number
-  PP?: number
+  pp?: number
   maxPP?: number
   team: Team
   flip: boolean
@@ -15,16 +16,16 @@ export default class LifeBar extends GameObjects.Graphics {
     scene: Phaser.Scene,
     x: number,
     y: number,
-    maxLife: number,
-    life: number,
+    maxHP: number,
+    hp: number,
     shield: number,
     team: Team,
     flip: boolean
   ) {
-    super(scene, { x: x, y: y })
+    super(scene, { x, y })
 
-    this.maxLife = maxLife
-    this.life = life
+    this.maxHp = maxHP
+    this.hp = hp
     this.shield = shield
     this.team = team
     this.flip = flip
@@ -39,7 +40,7 @@ export default class LifeBar extends GameObjects.Graphics {
     const ppBarBgColor = 0x282828
     const allyLifeColor = 0x76c442
     const enemyLifeColor = 0xe76e55
-    const shieldColor = 0xbbbbbb
+    const shieldColor = 0xe0e0e0
     const ppColor = 0x209cee
     const hpPerSegment = 25
 
@@ -48,14 +49,14 @@ export default class LifeBar extends GameObjects.Graphics {
 
     this.translateCanvas(-barWidth / 2, 0)
 
-    // life bar
+    // hp bar
     this.fillStyle(0x000000)
     this.fillRoundedRect(0, 0, barWidth, this.maxPP === undefined ? 8 : 14, 2)
 
-    // life and shield amount
-    if (this.life > 0) {
-      const totalLife = Math.max(this.maxLife, this.life + this.shield) // if life + shield exceeds maxLife, the amount of segments should expand accordingly
-      const lifePercentage = this.life / totalLife
+    // hp and shield amount
+    if (this.hp > 0) {
+      const totalLife = Math.max(this.maxHp, this.hp + this.shield) // if hp + shield exceeds maxHP, the amount of segments should expand accordingly
+      const lifePercentage = this.hp / totalLife
       const shieldPercentage = this.shield / totalLife
 
       this.save()
@@ -94,8 +95,8 @@ export default class LifeBar extends GameObjects.Graphics {
     }
 
     // PP
-    if (this.PP !== undefined && this.maxPP !== undefined) {
-      const ppPercentage = this.PP / this.maxPP
+    if (this.pp !== undefined && this.maxPP !== undefined) {
+      const ppPercentage = max(1)(this.pp / this.maxPP)
 
       this.fillStyle(ppBarBgColor, 1)
       this.fillRect(1, 9, innerBarWidth, 3)
@@ -105,10 +106,10 @@ export default class LifeBar extends GameObjects.Graphics {
     }
   }
 
-  setLife(value: number) {
+  setHp(value: number) {
     this.scene.tweens.add({
       targets: this,
-      life: value,
+      hp: value,
       duration: 150,
       onUpdate: this.draw.bind(this),
       ease: "Sine.easeOut"
@@ -125,14 +126,14 @@ export default class LifeBar extends GameObjects.Graphics {
     })
   }
 
-  setMaxLife(value: number) {
-    this.maxLife = value
+  setMaxHp(value: number) {
+    this.maxHp = value
   }
 
   setPP(value: number) {
     this.scene.tweens.add({
       targets: this,
-      PP: value,
+      pp: value,
       duration: 150,
       onUpdate: this.draw.bind(this),
       ease: "Sine.easeOut"
@@ -141,7 +142,7 @@ export default class LifeBar extends GameObjects.Graphics {
 
   setMaxPP(value: number) {
     this.maxPP = value
-    if (this.PP === undefined) this.PP = 0
+    if (this.pp === undefined) this.pp = 0
   }
 
   setTeam(team: number, flip: boolean) {

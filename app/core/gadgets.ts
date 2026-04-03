@@ -1,4 +1,4 @@
-import { BOTS_ENABLED } from "../types/Config"
+import { BOTS_ENABLED } from "../config"
 
 export type Gadget = {
   name: string
@@ -33,22 +33,43 @@ const JUKEBOX: Gadget = {
   name: "gadget.jukebox",
   description: "gadget.jukebox_desc",
   icon: "compact-disc",
-  levelRequired: 10
+  levelRequired: 5
 }
 
-const BOT_BUILDER: Gadget = {
-  name: "gadget.bot_builder",
-  description: "gadget.bot_builder_desc",
-  icon: "bot",
-  levelRequired: 20,
-  disabled: !BOTS_ENABLED
+const SYNERGY_WHEEL: Gadget = {
+  name: "gadget.synergy_wheel",
+  description: "gadget.synergy_wheel_desc",
+  icon: "synergy-wheel",
+  levelRequired: 10
 }
 
 const GAMEBOY: Gadget = {
   name: "gadget.gameboy",
   description: "gadget.gameboy_desc",
   icon: "gameboy",
+  levelRequired: 20
+}
+
+const POKEGUESSER: Gadget = {
+  name: "gadget.pokeguesser",
+  description: "gadget.pokeguesser_desc",
+  icon: "pokeguesser",
   levelRequired: 30
+}
+
+const BOT_BUILDER: Gadget = {
+  name: "gadget.bot_builder",
+  description: "gadget.bot_builder_desc",
+  icon: "bot",
+  levelRequired: 40,
+  disabled: !BOTS_ENABLED
+}
+
+const TIER_LIST_MAKER: Gadget = {
+  name: "gadget.tier_list_maker",
+  description: "gadget.tier_list_maker_desc",
+  icon: "tier-list",
+  levelRequired: 50
 }
 
 export const GADGETS = {
@@ -56,6 +77,9 @@ export const GADGETS = {
   BAG,
   TEAM_PLANNER,
   JUKEBOX,
+  SYNERGY_WHEEL,
   BOT_BUILDER,
-  GAMEBOY
+  GAMEBOY,
+  POKEGUESSER,
+  TIER_LIST_MAKER
 } as const

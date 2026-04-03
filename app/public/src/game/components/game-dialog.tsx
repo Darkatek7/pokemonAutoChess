@@ -1,12 +1,27 @@
+import { GameObjects } from "phaser"
 import React from "react"
 import ReactDOM from "react-dom/client"
-import { GameObjects } from "phaser"
+import PokemonPortrait, {
+  PortraitOptions
+} from "../../pages/component/pokemon-portrait"
 import { addIconsToDescription } from "../../pages/utils/descriptions"
 
 export class GameDialog extends GameObjects.DOMElement {
   dom: HTMLDivElement
 
-  constructor(scene: Phaser.Scene, dialog: string, dialogTitle?: string, extraClass?: string) {
+  constructor({
+    scene,
+    dialog,
+    dialogTitle,
+    portrait,
+    extraClass
+  }: {
+    scene: Phaser.Scene
+    dialog: string
+    dialogTitle?: string
+    portrait?: PortraitOptions
+    extraClass?: string
+  }) {
     super(scene, 0, 0)
 
     this.dom = document.createElement("div")
@@ -15,14 +30,17 @@ export class GameDialog extends GameObjects.DOMElement {
     const root = ReactDOM.createRoot(this.dom)
     root.render(
       <>
+        {portrait && (
+          <div className="game-dialog-portrait">
+            <PokemonPortrait portrait={portrait} />
+          </div>
+        )}
         {dialogTitle && (
           <div className="game-dialog-title">
             <p>{dialogTitle}</p>
           </div>
         )}
-        <div className="game-dialog-text">
-          {addIconsToDescription(dialog)}
-        </div>
+        <div className="game-dialog-text">{addIconsToDescription(dialog)}</div>
       </>
     )
   }

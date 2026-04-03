@@ -3,8 +3,9 @@ import { CircularProgressbarWithChildren } from "react-circular-progressbar"
 import { Tooltip } from "react-tooltip"
 
 import { IPlayer } from "../../../../../types"
-import { useAppSelector } from "../../../hooks"
 import { getAvatarSrc } from "../../../../../utils/avatar"
+import { DEPTH } from "../../../game/depths"
+import { useAppSelector } from "../../../hooks"
 import { cc } from "../../utils/jsx"
 import GamePlayerDetail from "./game-player-detail"
 
@@ -17,35 +18,39 @@ export default function GamePlayer(props: {
   index: number
 }) {
   const spectatedPlayerId = useAppSelector(
-    (state) => state.game.currentPlayerId
+    (state) => state.game.playerIdSpectated
   )
-  const selfPlayerId = useAppSelector((state) => state.network.uid)
+  const connectedPlayerId = useAppSelector((state) => state.network.uid)
 
   function playerClick() {
     props.click(props.player.id)
   }
 
   return (
-    <div
-      style={{
-        top: `${1 + props.index * 12.5}%`,
-        backgroundImage: `url('${getAvatarSrc(props.player.avatar)}')`
-      }}
-      className={cc("game-player", {
-        spectated: spectatedPlayerId === props.player.id,
-        self: selfPlayerId === props.player.id,
-        dead: props.player.life <= 0
-      })}
-      onClick={playerClick}
-      data-tooltip-id={"detail-" + props.player.id}
-    >
-      <CircularProgressbarWithChildren value={props.player.life} />
-      <div className="my-container life-text">{props.player.life}</div>
+    <div className="game-player-wrapper">
+      <div
+        style={{
+          top: `${1 + props.index * 12.5}%`,
+          backgroundImage: `url('${getAvatarSrc(props.player.avatar)}')`,
+          zIndex: DEPTH.PLAYER_ICON
+        }}
+        className={cc("game-player", {
+          spectated: spectatedPlayerId === props.player.id,
+          self: connectedPlayerId === props.player.id,
+          dead: props.player.life <= 0
+        })}
+        onClick={playerClick}
+        data-tooltip-id={"detail-" + props.player.id}
+      >
+        <CircularProgressbarWithChildren value={props.player.life} />
+        <div className="my-container life-text">{props.player.life}</div>
+      </div>
       <Tooltip
         id={"detail-" + props.player.id}
         className="custom-theme-tooltip"
         place="left"
         data-tooltip-offset={{ left: 30, bottom: props.index === 0 ? 50 : 0 }}
+        style={{ zIndex: DEPTH.TOOLTIP }}
       >
         <GamePlayerDetail player={props.player} />
       </Tooltip>

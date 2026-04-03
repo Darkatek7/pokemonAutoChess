@@ -1,6 +1,6 @@
 .game-item-detail {
   min-width: 200px;
-  max-width: 400px;
+  max-width: 440px;
   color: white;
   display: grid;
   font-size: 1.2rem;
@@ -34,6 +34,7 @@
 
 .game-item-recipe {
   float: right;
+  margin-left: 0.5em;
 }
 
 .game-item-recipe img {
@@ -52,6 +53,11 @@
   align-items: center;
   line-height: 1;
   min-height: 15px;
+}
+
+.game-item-detail-stats > i {
+  color: #a0a0a0;
+  font-style: italic;
 }
 
 .game-item-detail-stats > div {
@@ -86,7 +92,6 @@
   justify-content: space-between;
   grid-area: combinations;
   gap: 0.5em;
-  min-width: 320px;
 }
 
 .game-item-detail-combination {

@@ -1,19 +1,18 @@
-import React, { Dispatch, SetStateAction, useState } from "react"
+import React, { Dispatch, SetStateAction } from "react"
 import { useTranslation } from "react-i18next"
 import { Tab, TabList, TabPanel, Tabs } from "react-tabs"
 import { Language } from "../../../../../types/enum/Language"
 import { LanguageNames } from "../../../../dist/client/locales"
-import { useAppDispatch } from "../../../hooks"
-import { IPreferencesState, usePreferences } from "../../../preferences"
+import { useAppDispatch, useAppSelector } from "../../../hooks"
+import { usePreferences } from "../../../preferences"
 import { selectLanguage } from "../../../stores/NetworkStore"
 import { getGameScene } from "../../game"
 import { Checkbox } from "../checkbox/checkbox"
-import KeybindInfo from "./keybind-info"
-import GameFiles from "./game-files"
 import { Page } from "../main-sidebar/main-sidebar"
-
-import "./game-options-modal.css"
 import { Modal } from "../modal/modal"
+import GameFiles from "./game-files"
+import KeybindInfo from "./keybind-info"
+import "./game-options-modal.css"
 
 export default function GameOptionsModal(props: {
   show: boolean
@@ -23,7 +22,9 @@ export default function GameOptionsModal(props: {
   const [preferences, setPreferences] = usePreferences()
   const { t, i18n } = useTranslation()
   const dispatch = useAppDispatch()
-  const language = i18n.language
+  const language = useAppSelector(
+    (state) => state.network.profile?.language ?? i18n.language
+  )
 
   const renderers = {
     [Phaser.AUTO]: "Auto",
@@ -36,7 +37,8 @@ export default function GameOptionsModal(props: {
       show={props.show}
       onClose={props.hideModal}
       header={t("options")}
-      className="game-options-modal anchor-top">
+      className="game-options-modal anchor-top"
+    >
       <Tabs>
         <TabList>
           <Tab key="sound">{t("sound")}</Tab>
@@ -161,9 +163,29 @@ export default function GameOptionsModal(props: {
           <p>
             <Checkbox
               isDark
+              checked={preferences.disableCameraShake}
+              onToggle={(checked) => {
+                setPreferences({ disableCameraShake: checked })
+              }}
+              label={t("disable_camera_shake")}
+            />
+          </p>
+          <p>
+            <Checkbox
+              isDark
               checked={preferences.antialiasing}
               onToggle={(checked) => setPreferences({ antialiasing: checked })}
               label={t("antialiasing")}
+            />
+          </p>
+          <p>
+            <Checkbox
+              isDark
+              checked={preferences.colorblindMode}
+              onToggle={(checked) =>
+                setPreferences({ colorblindMode: checked })
+              }
+              label={t("colorblind_mode")}
             />
           </p>
           {props.page === "main_lobby" && (

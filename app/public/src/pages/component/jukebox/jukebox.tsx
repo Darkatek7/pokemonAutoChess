@@ -8,6 +8,7 @@ import { cc } from "../../utils/jsx"
 import { Modal } from "../modal/modal"
 
 import "./jukebox.css"
+import { pickRandomIn } from "../../../../../utils/random"
 
 export default function Jukebox(props: {
   show: boolean
@@ -37,23 +38,19 @@ export default function Jukebox(props: {
     if (gameScene) {
       gameScene.music?.destroy()
       setLoading(true)
-      const alreadyLoading = gameScene.load.isLoading()
-      if (!alreadyLoading) {
-        gameScene.load.reset()
-      }
-      preloadMusic(gameScene, name)
-      gameScene.load.once("complete", () => {
-        playMusic(gameScene, name)
-        setLoading(false)
+      gameScene.cache.audio.events.on("add", (cache, key) => {
+        if (key === "music_" + name) {
+          playMusic(gameScene, name)
+          setLoading(false)
+        }
       })
-      if (!alreadyLoading) {
-        gameScene.load.start()
-      }
+      preloadMusic(gameScene, name)
+      gameScene.load.start()
     }
   }
 
-  function handleVolumeChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const newVolume = Number(e.target.value)
+  function handleVolumeChange(e: React.InputEvent<HTMLInputElement>) {
+    const newVolume = Number(e.currentTarget.value)
     setVolume(newVolume)
   }
 
@@ -63,35 +60,66 @@ export default function Jukebox(props: {
     changeMusic(MUSICS[newIndex])
   }
 
+  function randomizeMusic() {
+    const newMusic = pickRandomIn(MUSICS.filter((m) => m !== music))
+    changeMusic(newMusic)
+  }
+
   return (
-    <Modal show={props.show} onClose={props.handleClose}
+    <Modal
+      show={props.show}
+      onClose={props.handleClose}
       className="game-jukebox-modal"
-      header={t("jukebox")}
+      header={t("gadget.jukebox")}
     >
       <div className="actions" style={{ marginBottom: "0.5em" }}>
-        <button className="bubbly blue" onClick={() => nextMusic(-1)}>
+        <button
+          className="bubbly blue"
+          onClick={() => nextMusic(-1)}
+          title={t("previous_music")}
+        >
           ◄
         </button>
         <div className={cc("compact-disc", { loading })}>
           <img src="/assets/ui/compact-disc.svg" />
           <span>{loading && t("loading")}</span>
         </div>
-        <button className="bubbly blue" onClick={() => nextMusic(+1)}>
+        <button
+          className="bubbly blue"
+          onClick={() => nextMusic(+1)}
+          title={t("next_music")}
+        >
           ►
         </button>
       </div>
 
-      <select
-        value={music}
-        onChange={(e) => changeMusic(e.target.value as DungeonMusic)}
-        className="is-light"
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "0.5em",
+          marginBottom: "0.5em"
+        }}
       >
-        {MUSICS.map((m) => (
-          <option key={m} value={m}>
-            {m}
-          </option>
-        ))}
-      </select>
+        <select
+          value={music}
+          onChange={(e) => changeMusic(e.target.value as DungeonMusic)}
+          className="is-light"
+        >
+          {MUSICS.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+        <button
+          className="bubbly blue"
+          onClick={() => randomizeMusic()}
+          title={t("random_music")}
+        >
+          <img src="/assets/ui/randomize.svg" style={{ marginRight: 0 }} />
+        </button>
+      </div>
 
       <p>
         <label className="full-width">

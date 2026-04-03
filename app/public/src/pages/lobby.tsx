@@ -1,35 +1,42 @@
-import { Room, RoomAvailable } from "colyseus.js"
+import { RoomAvailable } from "@colyseus/sdk"
 import firebase from "firebase/compat/app"
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
+import GameState from "../../../rooms/states/game-state"
+import { Transfer } from "../../../types"
+import { throttle } from "../../../utils/function"
+import { joinLobbyRoom } from "../game/lobby-logic"
 import { useAppDispatch, useAppSelector } from "../hooks"
+import { client, leaveRoom, rooms } from "../network"
 import { resetLobby } from "../stores/LobbyStore"
-import { logOut, setPendingGameId, setErrorAlertMessage } from "../stores/NetworkStore"
-import { Announcements } from "./component/announcements/announcements"
-import AvailableRoomMenu from "./component/available-room-menu/available-room-menu"
-import { GameRoomsMenu } from "./component/available-room-menu/game-rooms-menu"
+import {
+  clearNotification,
+  logOut,
+  setErrorAlertMessage,
+  setPendingGameId
+} from "../stores/NetworkStore"
+import { EventsMenu } from "./component/events-menu/events-menu"
 import LeaderboardMenu from "./component/leaderboard/leaderboard-menu"
 import { MainSidebar } from "./component/main-sidebar/main-sidebar"
 import { Modal } from "./component/modal/modal"
+import { NotificationModal } from "./component/notifications/notification-modal"
+import RoomMenu from "./component/room-menu/room-menu"
 import { cc } from "./utils/jsx"
-import { joinLobbyRoom } from "../game/lobby-logic"
-import { localStore, LocalStoreKeys } from "./utils/store"
-import GameState from "../../../rooms/states/game-state"
-import { throttle } from "../../../utils/function"
+import { LocalStoreKeys, localStore } from "./utils/store"
 import "./lobby.css"
 
 export default function Lobby() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
-  const lobby = useAppSelector((state) => state.network.lobby)
-  const client = useAppSelector((state) => state.network.client)
-  const networkError = useAppSelector(state => state.network.error)
-  const pendingGameId = useAppSelector(state => state.network.pendingGameId)
+  const networkError = useAppSelector((state) => state.network.error)
+  const pendingGameId = useAppSelector((state) => state.network.pendingGameId)
+  const notifications = useAppSelector((state) => state.network.notifications)
   const gameRooms: RoomAvailable[] = useAppSelector(
     (state) => state.lobby.gameRooms
   )
-  const showGameReconnect = pendingGameId != null && gameRooms.some((r) => r.roomId === pendingGameId)
+  const showGameReconnect =
+    pendingGameId != null && gameRooms.some((r) => r.roomId === pendingGameId)
 
   const { t } = useTranslation()
 
@@ -42,28 +49,32 @@ export default function Lobby() {
   }, [lobbyJoined])
 
   const signOut = useCallback(async () => {
-    if (lobby?.connection.isOpen) {
-      await lobby.leave()
-    }
+    leaveRoom("lobby")
     await firebase.auth().signOut()
     dispatch(resetLobby())
     dispatch(logOut())
     navigate("/")
-  }, [dispatch, lobby])
+  }, [dispatch])
+
+  const handleNotificationClose = (notificationId: string) => {
+    // Send acknowledgment to server
+    rooms.lobby?.send(Transfer.NOTIFICATION_SEEN, notificationId)
+    // Remove from local state
+    dispatch(clearNotification(notificationId))
+  }
 
   const reconnectToGame = throttle(async function reconnectToGame() {
     const idToken = await firebase.auth().currentUser?.getIdToken()
     if (idToken && pendingGameId) {
-      const game: Room<GameState> = await client.joinById(pendingGameId, { idToken })
+      const game = await client.joinById<GameState>(pendingGameId, {
+        idToken
+      })
       localStore.set(
         LocalStoreKeys.RECONNECTION_GAME,
         { reconnectionToken: game.reconnectionToken, roomId: game.roomId },
         30
       )
-      await Promise.allSettled([
-        lobby?.connection.isOpen && lobby.leave(false),
-        game.connection.isOpen && game.leave(false)
-      ])
+      leaveRoom("lobby", true)
       dispatch(resetLobby())
       navigate("/game")
     }
@@ -99,9 +110,15 @@ export default function Lobby() {
           </>
         }
       ></Modal>
+      <NotificationModal
+        notifications={notifications}
+        onClose={handleNotificationClose}
+      />
       <Modal
         show={networkError != null}
-        onClose={() => dispatch(setErrorAlertMessage(null))}
+        onClose={() => {
+          dispatch(setErrorAlertMessage(null))
+        }}
         className="is-dark basic-modal-body"
         body={<p style={{ padding: "1em" }}>{networkError}</p>}
       />
@@ -124,20 +141,20 @@ function MainLobby() {
             {t("leaderboard")}
           </li>
           <li
-            onClick={() => setActive("available_rooms")}
-            className={cc({ active: activeSection === "available_rooms" })}
+            onClick={() => setActive("rooms")}
+            className={cc({ active: activeSection === "rooms" })}
           >
             <img width={32} height={32} src={`assets/ui/room.svg`} />
             {t("rooms")}
           </li>
-          <li
+          {/*<li
             onClick={() => setActive("game_rooms")}
             className={cc({ active: activeSection === "game_rooms" })}
           >
             <img width={32} height={32} src={`assets/ui/spectate.svg`} />
             {t("in_game")}
           </li>
-          {/*<li
+          <li
             onClick={() => setActive("online")}
             className={cc({ active: activeSection === "online" })}
           >
@@ -145,11 +162,11 @@ function MainLobby() {
             {t("online")}
           </li>*/}
           <li
-            onClick={() => setActive("announcements")}
-            className={cc({ active: activeSection === "announcements" })}
+            onClick={() => setActive("events")}
+            className={cc({ active: activeSection === "events" })}
           >
             <img width={32} height={32} src={`assets/ui/chat.svg`} />
-            {t("announcements")}
+            {t("events")}
           </li>
         </ul>
       </nav>
@@ -160,25 +177,23 @@ function MainLobby() {
       >
         <LeaderboardMenu />
       </section>
-      <section
-        className={cc("rooms", { active: activeSection === "available_rooms" })}
-      >
-        <AvailableRoomMenu />
+      <section className={cc("rooms", { active: activeSection === "rooms" })}>
+        <RoomMenu />
       </section>
-      <section
+      {/*<section
         className={cc("game_rooms", { active: activeSection === "game_rooms" })}
       >
         <GameRoomsMenu />
       </section>
-      {/*<section className={cc("online", { active: activeSection === "online" })}>
+      <section className={cc("online", { active: activeSection === "online" })}>
         <CurrentUsers />
       </section>*/}
       <section
-        className={cc("announcements", {
-          active: activeSection === "announcements"
+        className={cc("events", {
+          active: activeSection === "events"
         })}
       >
-        <Announcements />
+        <EventsMenu />
       </section>
     </div>
   )

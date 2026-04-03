@@ -1,16 +1,35 @@
-import { CDN_PORTRAIT_URL, Emotion, PkmWithCustom } from "../types"
+import { Emotion, PkmWithCustom } from "../types"
 import { Pkm, PkmByIndex, PkmIndex } from "../types/enum/Pokemon"
 
+const PORTRAITS_FALLBACKS = {
+  "0669-0001": "0669",
+  "0669-0002": "0669",
+  "0669-0003": "0669",
+  "0669-0004": "0669",
+  "0670-0001": "0670",
+  "0670-0002": "0670",
+  "0670-0003": "0670",
+  "0670-0004": "0670"
+}
+
 export function getPortraitSrc(
-  index?: string,
+  index: string,
   shiny?: boolean,
   emotion?: Emotion
 ) {
+  if (index in PORTRAITS_FALLBACKS) index = PORTRAITS_FALLBACKS[index]
   return getAvatarSrc(getAvatarString(index, shiny, emotion))
 }
 
+export function getPkmFromPortraitSrc(src: string): PkmWithCustom | null {
+  const regex = /\/assets\/portraits\/([\w\/]+)\.png$/
+  const match = src.match(regex)
+  if (!match) return null
+  return getPokemonCustomFromAvatar(match[1])
+}
+
 export function getAvatarSrc(avatar: string) {
-  return `${CDN_PORTRAIT_URL}${avatar.replace(/(\d+)\-(\d+)/, "$1/$2")}.png`
+  return `/assets/portraits/${avatar.replace(/(\d+)\-/g, "$1/")}.png`
 }
 
 export function getAvatarString(
@@ -63,7 +82,12 @@ export function getPokemonCustomFromAvatar(avatar: string): PkmWithCustom {
     }
     if (split.length === 3) {
       index = `${split[0]}-${split[1]}`
-      shiny = true
+      shiny = split[2] === "0001"
+    }
+    if (split.length === 4) {
+      // ex: Meowstic Female, index 0678/0000/0000/0002
+      index = `${split[0]}-${split[1]}-0000-${split[3]}`
+      shiny = split[2] === "0001"
     }
   }
   return {

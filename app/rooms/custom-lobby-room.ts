@@ -1,27 +1,28 @@
 import { Dispatcher } from "@colyseus/command"
-import { Client, IRoomCache, Room, matchMaker, subscribeLobby } from "colyseus"
+import { Client, IRoomCache, matchMaker, Room, subscribeLobby } from "colyseus"
 import { CronJob } from "cron"
 import admin from "firebase-admin"
-import Message from "../models/colyseus-models/message"
-import { TournamentSchema } from "../models/colyseus-models/tournament"
-import { IBot } from "../models/mongo-models/bot-v2"
-import ChatV2 from "../models/mongo-models/chat-v2"
-import Tournament from "../models/mongo-models/tournament"
-import UserMetadata, {
-  IUserMetadata
-} from "../models/mongo-models/user-metadata"
-import { Emotion, IPlayer, Role, Title, Transfer } from "../types"
 import {
   INACTIVITY_TIMEOUT,
   MAX_CONCURRENT_PLAYERS_ON_LOBBY,
   MAX_CONCURRENT_PLAYERS_ON_SERVER,
   TOURNAMENT_CLEANUP_DELAY,
   TOURNAMENT_REGISTRATION_TIME
-} from "../types/Config"
+} from "../config"
+import Message from "../models/colyseus-models/message"
+import { TournamentSchema } from "../models/colyseus-models/tournament"
+import ChatV2 from "../models/mongo-models/chat-v2"
+import Tournament from "../models/mongo-models/tournament"
+import UserMetadata, {
+  toLeanUserMetadata
+} from "../models/mongo-models/user-metadata"
+import { notificationsService } from "../services/notifications"
+import { Emotion, Role, Title, Transfer } from "../types"
 import { CloseCodes } from "../types/enum/CloseCodes"
 import { GameMode } from "../types/enum/Game"
 import { Language } from "../types/enum/Language"
 import { ITournament } from "../types/interfaces/Tournament"
+import { IUserMetadataMongo } from "../types/interfaces/UserMetadata"
 import { logger } from "../utils/logger"
 import {
   BanUserCommand,
@@ -31,39 +32,41 @@ import {
   ChangeNameCommand,
   ChangeSelectedEmotionCommand,
   ChangeTitleCommand,
-  CreateTournamentLobbiesCommand,
-  EndTournamentMatchCommand,
+  DeleteAccountCommand,
+  DeleteRoomCommand,
   GiveBoostersCommand,
   GiveRoleCommand,
   GiveTitleCommand,
   HeapSnapshotCommand,
   JoinOrOpenRoomCommand,
-  NextTournamentStageCommand,
-  OnCreateTournamentCommand,
-  DeleteRoomCommand,
   OnJoinCommand,
   OnLeaveCommand,
   OnNewMessageCommand,
   OnSearchByIdCommand,
-  OnSearchCommand,
   OpenBoosterCommand,
-  ParticipateInTournamentCommand,
   RemoveMessageCommand,
-  DeleteTournamentCommand,
   SelectLanguageCommand,
-  UnbanUserCommand,
-  RemakeTournamentLobbyCommand,
-  DeleteAccountCommand
+  UnbanUserCommand
 } from "./commands/lobby-commands"
+import {
+  CreateTournamentLobbiesCommand,
+  DeleteTournamentCommand,
+  EndTournamentMatchCommand,
+  NextTournamentStageCommand,
+  OnCreateTournamentCommand,
+  ParticipateInTournamentCommand,
+  RemakeTournamentLobbyCommand
+} from "./commands/tournament-commands"
 import LobbyState from "./states/lobby-state"
 
-export default class CustomLobbyRoom extends Room<LobbyState> {
+export default class CustomLobbyRoom extends Room {
+  state = new LobbyState()
   unsubscribeLobby: (() => void) | undefined
   rooms: IRoomCache[] | undefined
   dispatcher: Dispatcher<this>
   tournamentCronJobs: Map<string, CronJob> = new Map<string, CronJob>()
   cleanUpCronJobs: CronJob[] = []
-  users: Map<string, IUserMetadata> = new Map<string, IUserMetadata>()
+  users: Map<string, IUserMetadataMongo> = new Map<string, IUserMetadataMongo>()
 
   constructor() {
     super()
@@ -109,9 +112,8 @@ export default class CustomLobbyRoom extends Room<LobbyState> {
 
   async onCreate(): Promise<void> {
     logger.info("create lobby", this.roomId)
-    this.state = new LobbyState()
     this.autoDispose = false
-    this.listing.unlisted = true
+    this["_listing"].unlisted = true
 
     this.clock.setInterval(async () => {
       const ccu = await matchMaker.stats.getGlobalCCU()
@@ -167,8 +169,12 @@ export default class CustomLobbyRoom extends Room<LobbyState> {
 
     this.onMessage(
       Transfer.UNBAN,
-      (client, { uid, name }: { uid: string; name: string }) => {
-        this.dispatcher.dispatch(new UnbanUserCommand(), { client, uid, name })
+      (client, { uid, reason }: { uid: string; reason: string }) => {
+        this.dispatcher.dispatch(new UnbanUserCommand(), {
+          client,
+          uid,
+          reason
+        })
       }
     )
 
@@ -275,10 +281,6 @@ export default class CustomLobbyRoom extends Room<LobbyState> {
       }
     )
 
-    this.onMessage(Transfer.HEAP_SNAPSHOT, (client) => {
-      this.dispatcher.dispatch(new HeapSnapshotCommand())
-    })
-
     this.onMessage(
       Transfer.GIVE_TITLE,
       (client, { uid, title }: { uid: string; title: Title }) => {
@@ -288,6 +290,10 @@ export default class CustomLobbyRoom extends Room<LobbyState> {
 
     this.onMessage(Transfer.DELETE_ACCOUNT, (client) => {
       this.dispatcher.dispatch(new DeleteAccountCommand(), { client })
+    })
+
+    this.onMessage(Transfer.HEAP_SNAPSHOT, (client) => {
+      this.dispatcher.dispatch(new HeapSnapshotCommand(), { client })
     })
 
     this.onMessage(
@@ -320,7 +326,7 @@ export default class CustomLobbyRoom extends Room<LobbyState> {
           index,
           emotion,
           shiny
-        }: { index: string; emotion: Emotion; shiny: boolean }
+        }: { index: string; emotion: Emotion | null; shiny: boolean }
       ) => {
         this.dispatcher.dispatch(new ChangeSelectedEmotionCommand(), {
           client,
@@ -364,9 +370,18 @@ export default class CustomLobbyRoom extends Room<LobbyState> {
       this.dispatcher.dispatch(new OnSearchByIdCommand(), { client, uid })
     })
 
-    this.onMessage(Transfer.SEARCH, (client, { name }: { name: string }) => {
-      this.dispatcher.dispatch(new OnSearchCommand(), { client, name })
-    })
+    // Handle notification acknowledgment from client
+    this.onMessage(
+      Transfer.NOTIFICATION_SEEN,
+      (client, notificationId: string) => {
+        if (client.auth) {
+          notificationsService.clearNotification(
+            client.auth.uid,
+            notificationId
+          )
+        }
+      }
+    )
 
     this.onMessage(
       Transfer.CHANGE_AVATAR,
@@ -387,12 +402,8 @@ export default class CustomLobbyRoom extends Room<LobbyState> {
       }
     )
 
-    /*this.presence.subscribe("ranked-lobby-winner", (player: IPlayer) => {
-      this.state.addAnnouncement(`${player.name} won the ranked match !`)
-    })*/
-
-    this.presence.subscribe("tournament-winner", (player: IPlayer) => {
-      this.state.addAnnouncement(`${player.name} won the tournament !`)
+    this.presence.subscribe("announcement", (message: string) => {
+      this.state.addAnnouncement(message)
     })
 
     this.presence.subscribe(
@@ -418,12 +429,20 @@ export default class CustomLobbyRoom extends Room<LobbyState> {
       this.state.addAnnouncement(message)
     })
 
+    this.presence.subscribe("notification-added", (notif) =>
+      notificationsService.onNotificationAdded(notif)
+    )
+
     this.initCronJobs()
     //this.fetchChat()
     this.fetchTournaments()
   }
 
-  async onAuth(client: Client, options, context) {
+  async onAuth(
+    client: Client,
+    options,
+    context
+  ): Promise<admin.auth.UserRecord> {
     try {
       super.onAuth(client, options, context)
       const token = await admin.auth().verifyIdToken(options.idToken)
@@ -438,14 +457,14 @@ export default class CustomLobbyRoom extends Room<LobbyState> {
 
       return user
     } catch (error) {
-      //logger.info(error)
-      // biome-ignore lint/complexity/noUselessCatch: <explanation>
+      logger.error(`Error on authentication on lobby room`, error)
       throw error // https://docs.colyseus.io/community/deny-player-join-a-room/
     }
   }
 
-  async onJoin(client: Client, options: any, auth: any) {
-    const user = await UserMetadata.findOne({ uid: client.auth.uid })
+  async onJoin(client: Client) {
+    const leanUser = await UserMetadata.findOne({ uid: client.auth.uid }).lean()
+    const user = leanUser ? toLeanUserMetadata(leanUser) : null
     try {
       if (user?.banned) {
         throw new Error("Account banned")
@@ -468,18 +487,24 @@ export default class CustomLobbyRoom extends Room<LobbyState> {
     this.dispatcher.dispatch(new OnJoinCommand(), { client, user })
   }
 
-  async onLeave(client: Client, consented: boolean) {
+  async onDrop(client: Client, code: number) {
     try {
-      if (consented) {
-        throw new Error("consented leave")
-      }
+      // allow reconnection for 30 seconds
       await this.allowReconnection(client, 30)
-      // if reconnected, dispatch the same event as if the user had joined to send them the initial data
-      const user = this.users.get(client.auth.uid) ?? null
-      this.dispatcher.dispatch(new OnJoinCommand(), { client, user })
-    } catch (error) {
-      this.dispatcher.dispatch(new OnLeaveCommand(), { client })
+    } catch (e) {
+      /*if (client && client.auth && client.auth.displayName) {
+        logger.info(`${client.auth.displayName} left lobby room`)
+      }*/
     }
+  }
+
+  async onReconnect(client: Client) {
+    // if reconnected, trigger the onJoin logic again to send them the initial data
+    this.onJoin(client)
+  }
+
+  async onLeave(client: Client, code: number) {
+    this.dispatcher.dispatch(new OnLeaveCommand(), { client })
   }
 
   onDispose() {

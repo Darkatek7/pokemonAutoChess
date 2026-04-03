@@ -1,4 +1,7 @@
+import { MapSchema } from "@colyseus/schema"
 import { t } from "i18next"
+import { TownEncounterSellPrice } from "../../../../config"
+import GameState from "../../../../rooms/states/game-state"
 import {
   Emotion,
   IFloatingItem,
@@ -9,6 +12,14 @@ import {
 } from "../../../../types"
 import { Orientation, PokemonActionState } from "../../../../types/enum/Game"
 import { Pkm } from "../../../../types/enum/Pokemon"
+import { SpecialGameRule } from "../../../../types/enum/SpecialGameRule"
+import {
+  TownEncounter,
+  TownEncounters
+} from "../../../../types/enum/TownEncounter"
+import { ILeaderboardInfo } from "../../../../types/interfaces/LeaderboardInfo"
+import { getRankLabel } from "../../../../types/strings/Strings"
+import { getPokemonCustomFromAvatar } from "../../../../utils/avatar"
 import { logger } from "../../../../utils/logger"
 import { clamp } from "../../../../utils/number"
 import {
@@ -16,22 +27,13 @@ import {
   transformMiniGameYCoordinate
 } from "../../pages/utils/utils"
 import AnimationManager from "../animation-manager"
+import { DEPTH } from "../depths"
 import GameScene from "../scenes/game-scene"
 import { FloatingItemContainer } from "./floating-item-container"
+import { GameDialog } from "./game-dialog"
 import PokemonAvatar from "./pokemon-avatar"
 import PokemonSpecial from "./pokemon-special"
 import { Portal, SynergySymbol } from "./portal"
-import { DEPTH } from "../depths"
-import {
-  TownEncounter,
-  TownEncounters,
-  TownEncounterSellPrice
-} from "../../../../core/town-encounters"
-import { GameDialog } from "./game-dialog"
-import { ILeaderboardInfo } from "../../../../types/interfaces/LeaderboardInfo"
-import { getPokemonCustomFromAvatar } from "../../../../utils/avatar"
-import { getRankLabel } from "../../../../types/strings/Strings"
-import { SpecialGameRule } from "../../../../types/enum/SpecialGameRule"
 
 export default class MinigameManager {
   pokemons: Map<string, PokemonAvatar>
@@ -49,8 +51,7 @@ export default class MinigameManager {
     scene: GameScene,
     animationManager: AnimationManager,
     uid: string,
-    avatars: Map<string, IPokemonAvatar>,
-    items: Map<string, IFloatingItem>
+    existingState: GameState
   ) {
     this.pokemons = new Map<string, PokemonAvatar>()
     this.items = new Map<string, FloatingItemContainer>()
@@ -60,8 +61,14 @@ export default class MinigameManager {
     this.scene = scene
     this.display = false
     this.animationManager = animationManager
-    this.buildPokemons(avatars)
-    this.buildItems(items)
+    this.buildPokemons(existingState.avatars)
+    this.buildItems(existingState.floatingItems)
+    this.buildPortals(
+      existingState.portals,
+      existingState.symbols,
+      existingState.avatars
+    )
+
     this.scene.room?.onMessage(
       Transfer.NPC_DIALOG,
       (message: { npc: Pkm; dialog: string }) => this.onNpcDialog(message)
@@ -101,15 +108,41 @@ export default class MinigameManager {
     this.symbols.forEach(interpolatePosition(0.02, 0.25, 50))
   }
 
-  buildPokemons(avatars: Map<string, IPokemonAvatar>) {
+  buildPokemons(avatars: MapSchema<IPokemonAvatar, string>) {
     avatars.forEach((pkm) => {
-      this.addPokemon(pkm)
+      if (pkm.portalId === "") {
+        // we dont show pokemon if it has already taken a portal
+        this.addPokemon(pkm)
+      }
     })
   }
 
-  buildItems(items: Map<string, IFloatingItem>) {
+  buildItems(items: MapSchema<IFloatingItem, string>) {
     items.forEach((item) => {
       this.addItem(item)
+    })
+  }
+
+  buildPortals(
+    portals: MapSchema<IPortal, string>,
+    symbols: MapSchema<ISynergySymbol, string>,
+    avatars: MapSchema<IPokemonAvatar, string>
+  ) {
+    const portalsTaken = new Set<string>()
+    avatars.forEach((avatar) => {
+      if (avatar.portalId) {
+        portalsTaken.add(avatar.portalId)
+      }
+    })
+    portals.forEach((portal) => {
+      if (portalsTaken.has(portal.id) === false) {
+        this.addPortal(portal)
+      }
+    })
+    symbols.forEach((symbol) => {
+      if (portalsTaken.has(symbol.portalId) === false) {
+        this.addSymbol(symbol)
+      }
     })
   }
 
@@ -203,7 +236,7 @@ export default class MinigameManager {
           if (value != "" && typeof value === "string") {
             const avatar = this.pokemons.get(value)
             this.symbols.forEach((symbol) => {
-              if (symbol.getData("portalId") === portal.id) {
+              if (symbol.portalId === portal.id) {
                 this.removeSymbol(symbol)
               }
             })
@@ -227,7 +260,8 @@ export default class MinigameManager {
       symbol.id,
       transformMiniGameXCoordinate(symbol.x),
       transformMiniGameYCoordinate(symbol.y),
-      symbol.synergy
+      symbol.synergy,
+      symbol.portalId
     )
     this.symbols.set(s.id, s)
   }
@@ -257,7 +291,7 @@ export default class MinigameManager {
           break
 
         case "portalId":
-          symbolUI.setData("portalId", value)
+          symbolUI.portalId = value as string
           break
       }
     }
@@ -276,11 +310,7 @@ export default class MinigameManager {
 
     if (pokemonUI.isCurrentPlayerAvatar) {
       const arrowIndicator = this.scene.add
-        .sprite(
-          pokemonUI.x + pokemonUI.width / 2 - 16,
-          pokemonUI.y - 70,
-          "arrowDown"
-        )
+        .sprite(pokemonUI.x, pokemonUI.y - 70, "arrowDown")
         .setDepth(DEPTH.INDICATOR)
         .setScale(2)
       this.scene.tweens.add({
@@ -345,21 +375,6 @@ export default class MinigameManager {
     }
   }
 
-  addKecleon() {
-    this.villagers.push(
-      new PokemonSpecial({
-        scene: this.scene,
-        x: 1000,
-        y: 408,
-        name: Pkm.KECLEON,
-        orientation: Orientation.DOWN,
-        animation: PokemonActionState.IDLE,
-        dialog: t("npc_dialog.tell_price"),
-        dialogTitle: t("npc_dialog.welcome")
-      })
-    )
-  }
-
   addVillagers(encounter: TownEncounter | null, podium: ILeaderboardInfo[]) {
     const cx = 980,
       cy = 404
@@ -412,11 +427,21 @@ export default class MinigameManager {
       name: Pkm.DUSKULL
     })
 
+    const meowth = new PokemonSpecial({
+      scene: this.scene,
+      x: encounter === TownEncounters.MEOWTH ? cx : 38 * 48,
+      y: encounter === TownEncounters.MEOWTH ? cy : 7 * 48,
+      name: Pkm.MEOWTH
+    })
+
     const regirock = new PokemonSpecial({
       scene: this.scene,
       x: encounter === TownEncounters.REGIROCK ? cx : 24 * 48,
       y: encounter === TownEncounters.REGIROCK ? cy : 22 * 48,
-      name: Pkm.REGIROCK
+      name: Pkm.REGIROCK,
+      dialog: t("thanks_for_playing"),
+      dialogTitle: "Keldaan",
+      emotion: Emotion.HAPPY
     })
 
     const marowak = new PokemonSpecial({
@@ -424,6 +449,15 @@ export default class MinigameManager {
       x: encounter === TownEncounters.MAROWAK ? cx : 41 * 48,
       y: encounter === TownEncounters.MAROWAK ? cy : 12 * 48,
       name: Pkm.MAROWAK
+    })
+
+    const celebi = new PokemonSpecial({
+      scene: this.scene,
+      x: encounter === TownEncounters.CELEBI ? cx : 33 * 48,
+      y: encounter === TownEncounters.CELEBI ? cy : 23 * 48,
+      name: Pkm.CELEBI,
+      shiny: true,
+      orientation: Orientation.DOWNLEFT
     })
 
     const wobbuffet = new PokemonSpecial({
@@ -447,13 +481,24 @@ export default class MinigameManager {
       name: Pkm.SPINDA
     })
 
+    const sableye = new PokemonSpecial({
+      scene: this.scene,
+      x: encounter === TownEncounters.SABLEYE ? cx : 37.25 * 48,
+      y: encounter === TownEncounters.SABLEYE ? cy : 5 * 48,
+      orientation: Orientation.DOWNLEFT,
+      name: Pkm.SABLEYE
+    })
+
     const mareep = new PokemonSpecial({
       scene: this.scene,
       x: 46 * 48,
       y: 2.5 * 48,
       name: Pkm.MAREEP,
       orientation: Orientation.DOWNLEFT,
-      animation: PokemonActionState.EAT
+      animation: PokemonActionState.EAT,
+      dialog: t("thanks_for_playing"),
+      dialogTitle: "Curry",
+      emotion: Emotion.HAPPY
     })
 
     const munchlax = new PokemonSpecial({
@@ -467,6 +512,69 @@ export default class MinigameManager {
           ? PokemonActionState.EAT
           : PokemonActionState.SLEEP
     })
+
+    const makuhita = new PokemonSpecial({
+      scene: this.scene,
+      x: encounter === TownEncounters.MAKUHITA ? cx : 36 * 48,
+      y: encounter === TownEncounters.MAKUHITA ? cy : 8.25 * 48,
+      name: Pkm.MAKUHITA
+    })
+
+    const croagunk = new PokemonSpecial({
+      scene: this.scene,
+      x: encounter === TownEncounters.CROAGUNK ? cx : 11.5 * 48,
+      y: encounter === TownEncounters.CROAGUNK ? cy : 21.25 * 48,
+      name: Pkm.CROAGUNK
+    })
+
+    const wigglytuff = new PokemonSpecial({
+      scene: this.scene,
+      x: encounter === TownEncounters.WIGGLYTUFF ? cx : 2 * 48,
+      y: encounter === TownEncounters.WIGGLYTUFF ? cy : 9 * 48,
+      name: Pkm.WIGGLYTUFF
+    })
+
+    const cincinno = new PokemonSpecial({
+      scene: this.scene,
+      x: encounter === TownEncounters.CINCCINO ? cx : 18 * 48,
+      y: encounter === TownEncounters.CINCCINO ? cy : 23 * 48,
+      orientation:
+        encounter === TownEncounters.CINCCINO
+          ? Orientation.DOWN
+          : Orientation.UP,
+      name: Pkm.CINCCINO
+    })
+
+    const magnezone = new PokemonSpecial({
+      scene: this.scene,
+      x: encounter === TownEncounters.MAGNEZONE ? cx : 41 * 48,
+      y: encounter === TownEncounters.MAGNEZONE ? cy : 15 * 48,
+      name: Pkm.MAGNEZONE
+    })
+
+    const kingambit = new PokemonSpecial({
+      scene: this.scene,
+      x: encounter === TownEncounters.KINGAMBIT ? cx : 44.5 * 48,
+      y: encounter === TownEncounters.KINGAMBIT ? cy : 5 * 48,
+      name: Pkm.KINGAMBIT
+    })
+
+    const lapras = new PokemonSpecial({
+      scene: this.scene,
+      x: encounter === TownEncounters.LAPRAS ? cx : 0 * 48,
+      y: encounter === TownEncounters.LAPRAS ? cy : 3.75 * 48,
+      name: Pkm.LAPRAS,
+      animation: PokemonActionState.WALK,
+      orientation:
+        encounter === TownEncounters.LAPRAS
+          ? Orientation.DOWN
+          : Orientation.RIGHT
+    })
+
+    if (encounter !== TownEncounters.LAPRAS) {
+      lapras.moveManager.setSpeed(15)
+      lapras.moveManager.moveTo(8 * 48, 4 * 48)
+    }
 
     const podiumPokemons = podium.map((p, rank) => {
       const { name, shiny } = getPokemonCustomFromAvatar(p.avatar)
@@ -495,11 +603,21 @@ export default class MinigameManager {
       duskull,
       regirock,
       marowak,
+      celebi,
       mareep,
       wobbuffet,
       wynaut,
       spinda,
+      sableye,
       munchlax,
+      meowth,
+      makuhita,
+      croagunk,
+      wigglytuff,
+      cincinno,
+      magnezone,
+      kingambit,
+      lapras,
       ...podiumPokemons
     )
 
@@ -542,11 +660,16 @@ export default class MinigameManager {
     }
   }
 
-  onNpcDialog({ npc, dialog }: { npc: Pkm; dialog: string }) {
+  onNpcDialog({ npc, dialog, ...otherArgs }: { npc: Pkm; dialog: string }) {
     const villager = this.villagers.find((pkm) => pkm.name === npc)
     if (villager) {
       if (dialog) {
-        this.scene.board?.displayText(villager.x, villager.y - 10, t(dialog))
+        this.scene.board?.displayText(
+          villager.x,
+          villager.y - 10,
+          t(dialog, otherArgs),
+          true
+        )
       } else {
         villager.emoteAnimation()
       }
@@ -554,13 +677,11 @@ export default class MinigameManager {
   }
 
   showEncounterDescription(desc: string) {
-    this.encounterDescription = new GameDialog(
-      this.scene,
-      desc,
-      undefined,
-      "town-encounter-description"
-    )
-    this.encounterDescription
+    this.encounterDescription = new GameDialog({
+      scene: this.scene,
+      dialog: desc,
+      extraClass: "town-encounter-description"
+    })
       .setOrigin(0, 0)
       .setPosition(15 * 48, 15 * 48)
       .removeInteractive()
@@ -568,7 +689,7 @@ export default class MinigameManager {
     this.scene.add.existing(this.encounterDescription)
   }
 
-  closeDetails() {
+  closeTooltips() {
     for (const it of this.items.values()) {
       it.closeDetail()
     }

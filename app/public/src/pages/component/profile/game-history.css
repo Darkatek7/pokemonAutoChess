@@ -1,6 +1,7 @@
 .game-history-list {
   display: flex;
   flex-direction: column;
+  min-height: 320px;
 }
 
 .game-history-list h2 {
@@ -20,7 +21,7 @@
   grid-template-areas:
     "top elo syn team"
     "date date syn team";
-  grid-template-columns: 8ch 7ch 120px 1fr;
+  grid-template-columns: 8ch 7ch 160px 1fr;
   background-color: var(--color-bg-secondary);
   margin: 0 0 0.5em 0;
   padding: 0.25em;
@@ -46,7 +47,7 @@
   grid-area: top;
   display: flex;
   align-items: center;
-  gap: .25em;
+  gap: 0.25em;
 }
 .game-history .elo {
   grid-area: elo;

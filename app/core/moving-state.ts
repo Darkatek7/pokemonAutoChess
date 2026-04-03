@@ -1,14 +1,16 @@
 import Player from "../models/colyseus-models/player"
-import { Effect } from "../types/enum/Effect"
+import { EffectEnum } from "../types/enum/Effect"
 import { PokemonActionState } from "../types/enum/Game"
 import { Passive } from "../types/enum/Passive"
 import { Synergy } from "../types/enum/Synergy"
 import { distanceC } from "../utils/distance"
-import Board from "./board"
-import { PokemonEntity, getMoveSpeed } from "./pokemon-entity"
-import PokemonState from "./pokemon-state"
 import { findPath } from "../utils/pathfind"
-import { broadcastAbility } from "./abilities/abilities"
+import { AbilityStrategies, castAbility } from "./abilities/abilities"
+import type { Board } from "./board"
+import { OnMoveEffect } from "./effects/effect"
+import { drumBeat, partingShot, stenchJump } from "./effects/passives"
+import { getMoveSpeed, PokemonEntity } from "./pokemon-entity"
+import PokemonState from "./pokemon-state"
 
 export default class MovingState extends PokemonState {
   name = "moving"
@@ -17,10 +19,7 @@ export default class MovingState extends PokemonState {
     super.update(pokemon, dt, board, player)
     if (pokemon.cooldown <= 0) {
       pokemon.cooldown = Math.round(500 / getMoveSpeed(pokemon)) // 500ms to move one cell at 50 speed in normal conditions
-      const targetAtRange = this.getNearestTargetAtRangeCoordinates(
-        pokemon,
-        board
-      )
+      const targetAtRange = this.getNearestTargetAtRange(pokemon, board)
       if (pokemon.status.charm && pokemon.canMove) {
         if (
           pokemon.status.charmOrigin &&
@@ -36,20 +35,34 @@ export default class MovingState extends PokemonState {
             y: pokemon.status.charmOrigin.positionY
           })
         }
+      } else if (
+        pokemon.pp >= pokemon.maxPP &&
+        pokemon.canCast &&
+        AbilityStrategies[pokemon.skill]?.requiresTarget === false
+      ) {
+        castAbility(pokemon.skill, pokemon, board, null)
       } else if (targetAtRange) {
         pokemon.toAttackingState()
-      } else {
-        const targetAtSight = this.getNearestTargetAtSightCoordinates(
-          pokemon,
-          board
+      } else if (
+        pokemon.passive === Passive.DRUMMER &&
+        board.cells.some(
+          (entity) =>
+            entity?.team === pokemon.team &&
+            entity?.passive !== Passive.DRUMMER &&
+            entity?.passive !== Passive.INANIMATE
         )
+      ) {
+        drumBeat(pokemon, board)
+      } else {
+        const targetAtSight = this.getNearestTargetAtSight(pokemon, board)
         if (targetAtSight && pokemon.canMove) {
           this.move(pokemon, board, targetAtSight)
         }
       }
     } else {
       pokemon.cooldown = Math.max(0, pokemon.cooldown - dt)
-      if (pokemon.status.skydiving && pokemon.cooldown <= 0) {
+      if (pokemon.status.skydiving && pokemon.cooldown <= 500) {
+        // just landed, 500ms remaining cooldown to reposition
         pokemon.status.skydiving = false
       }
     }
@@ -80,45 +93,22 @@ export default class MovingState extends PokemonState {
         y = farthestCoordinate.y
 
         if (pokemon.passive === Passive.STENCH) {
-          board
-            .getCellsBetween(x, y, pokemon.positionX, pokemon.positionY)
-            .forEach((cell) => {
-              if (cell.x !== x || cell.y !== y) {
-                board.addBoardEffect(
-                  cell.x,
-                  cell.y,
-                  Effect.POISON_GAS,
-                  pokemon.simulation
-                )
-              }
-            })
+          stenchJump(pokemon, board, x, y)
         }
 
-        if (pokemon.passive === Passive.PARTING_SHOT) {
-          farthestCoordinate.target.addAbilityPower(-20, pokemon, 0, false)
-          farthestCoordinate.target.addAttack(
-            -0.2 * farthestCoordinate.target.baseAtk,
-            pokemon,
-            0,
+        if (
+          pokemon.passive === Passive.PARTING_SHOT &&
+          farthestCoordinate.target.effects.has(EffectEnum.PARTING_SHOT) ===
             false
-          )
-          broadcastAbility(pokemon, {
-            skill: "PARTING_SHOT",
-            positionX: x,
-            positionY: y
-          })
+        ) {
+          partingShot(pokemon, farthestCoordinate.target, x, y)
         }
 
         // logger.debug(`pokemon ${pokemon.name} jumped from (${pokemon.positionX},${pokemon.positionY}) to (${x},${y}), (desired direction (${coordinates.x}, ${coordinates.y})), orientation: ${pokemon.orientation}`);
-        board.swapValue(pokemon.positionX, pokemon.positionY, x, y)
-        pokemon.orientation = board.orientation(
-          x,
-          y,
-          pokemon.targetX,
-          pokemon.targetY,
-          pokemon,
-          undefined
-        )
+        const oldX = pokemon.positionX
+        const oldY = pokemon.positionY
+        board.swapCells(oldX, oldY, x, y)
+        this.onMove(pokemon, board, oldX, oldY, x, y)
       }
     } else {
       // Using pathfinding to get optimal path
@@ -150,18 +140,36 @@ export default class MovingState extends PokemonState {
         }
       })
       if (x !== undefined && y !== undefined) {
-        pokemon.orientation = board.orientation(
-          pokemon.positionX,
-          pokemon.positionY,
-          x,
-          y,
-          pokemon,
-          undefined
-        )
         // logger.debug(`pokemon ${pokemon.name} moved from (${pokemon.positionX},${pokemon.positionY}) to (${x},${y}), (desired direction (${coordinates.x}, ${coordinates.y})), orientation: ${pokemon.orientation}`);
-        board.swapValue(pokemon.positionX, pokemon.positionY, x, y)
+        const oldX = pokemon.positionX
+        const oldY = pokemon.positionY
+        board.swapCells(oldX, oldY, x, y)
+        this.onMove(pokemon, board, oldX, oldY, x, y)
       }
     }
+  }
+
+  onMove(
+    pokemon: PokemonEntity,
+    board: Board,
+    oldX: number,
+    oldY: number,
+    newX: number,
+    newY: number
+  ) {
+    // update orientation
+    pokemon.orientation = board.orientation(
+      oldX,
+      oldY,
+      newX,
+      newY,
+      pokemon,
+      undefined
+    )
+
+    pokemon.getEffects(OnMoveEffect).forEach((effect) => {
+      effect.apply(pokemon, board, oldX, oldY, newX, newY)
+    })
   }
 
   onEnter(pokemon: PokemonEntity) {

@@ -1,4 +1,5 @@
-import { PayloadAction, createSlice } from "@reduxjs/toolkit"
+import { createSlice, PayloadAction, Slice } from "@reduxjs/toolkit"
+import { StageDuration } from "../../../config"
 import Simulation from "../../../core/simulation"
 import ExperienceManager from "../../../models/colyseus-models/experience-manager"
 import Synergies from "../../../models/colyseus-models/synergies"
@@ -9,19 +10,19 @@ import {
   IPlayer,
   ISimulation
 } from "../../../types"
-import { StageDuration } from "../../../types/Config"
-import { GamePhaseState, Team } from "../../../types/enum/Game"
+import { GameMode, GamePhaseState, Team } from "../../../types/enum/Game"
 import { Item } from "../../../types/enum/Item"
 import { Pkm, PkmProposition } from "../../../types/enum/Pokemon"
 import { SpecialGameRule } from "../../../types/enum/SpecialGameRule"
 import { Synergy } from "../../../types/enum/Synergy"
 import { Weather } from "../../../types/enum/Weather"
-import { getGameScene } from "../pages/game"
-import { entries } from "../../../utils/schemas"
 import { ILeaderboardInfo } from "../../../types/interfaces/LeaderboardInfo"
+import { entries } from "../../../utils/schemas"
+import { getGameScene } from "../pages/game"
 
 export interface GameStateStore {
   afterGameId: string
+  gameMode: GameMode
   phaseDuration: number
   roundTime: number
   phase: GamePhaseState
@@ -30,11 +31,13 @@ export interface GameStateStore {
   stageLevel: number
   noElo: boolean
   specialGameRule: SpecialGameRule | null
-  currentPlayerId: string
-  currentSimulationId: string
-  currentTeam: Team
+  playerIdSpectated: string
+  simulationIdSpectated: string
+  teamSpectated: Team
+  synergiesSpectated: [string, number][]
   money: number
   interest: number
+  maxInterest: number
   streak: number
   shopFreeRolls: number
   shopLocked: boolean
@@ -42,7 +45,6 @@ export interface GameStateStore {
   shop: Pkm[]
   itemsProposition: Item[]
   pokemonsProposition: PkmProposition[]
-  currentPlayerSynergies: [string, number][]
   weather: Weather
   blueDpsMeter: IDps[]
   redDpsMeter: IDps[]
@@ -53,6 +55,7 @@ export interface GameStateStore {
 
 const initialState: GameStateStore = {
   afterGameId: "",
+  gameMode: GameMode.CUSTOM_LOBBY,
   phaseDuration: StageDuration[1],
   roundTime: StageDuration[1],
   phase: GamePhaseState.PICK,
@@ -61,11 +64,13 @@ const initialState: GameStateStore = {
   stageLevel: 0,
   weather: Weather.NEUTRAL,
   noElo: false,
-  currentPlayerId: "",
-  currentSimulationId: "",
-  currentTeam: Team.BLUE_TEAM,
+  playerIdSpectated: "",
+  simulationIdSpectated: "",
+  teamSpectated: Team.BLUE_TEAM,
+  synergiesSpectated: new Array<[Synergy, number]>(),
   money: 5,
   interest: 0,
+  maxInterest: 5,
   streak: 0,
   shopFreeRolls: 0,
   shopLocked: false,
@@ -73,7 +78,6 @@ const initialState: GameStateStore = {
   shop: new Array<Pkm>(),
   itemsProposition: new Array<Item>(),
   pokemonsProposition: new Array<Pkm>(),
-  currentPlayerSynergies: new Array<[Synergy, number]>(),
   blueDpsMeter: new Array<IDps>(),
   redDpsMeter: new Array<IDps>(),
   emotesUnlocked: [],
@@ -82,7 +86,7 @@ const initialState: GameStateStore = {
   podium: new Array<ILeaderboardInfo>()
 }
 
-export const gameSlice = createSlice({
+export const gameSlice: Slice<GameStateStore> = createSlice({
   name: "game",
   initialState: initialState,
   reducers: {
@@ -119,6 +123,9 @@ export const gameSlice = createSlice({
     },
     setInterest: (state, action: PayloadAction<number>) => {
       state.interest = action.payload
+    },
+    setMaxInterest: (state, action: PayloadAction<number>) => {
+      state.maxInterest = action.payload
     },
     setStreak: (state, action: PayloadAction<number>) => {
       state.streak = action.payload
@@ -175,8 +182,8 @@ export const gameSlice = createSlice({
       state,
       action: PayloadAction<{ value: Synergies; id: string }>
     ) => {
-      if (state.currentPlayerId === action.payload.id) {
-        state.currentPlayerSynergies = Array.from(action.payload.value)
+      if (state.playerIdSpectated === action.payload.id) {
+        state.synergiesSpectated = Array.from(action.payload.value)
       }
 
       const playerToUpdate = state.players.findIndex(
@@ -184,8 +191,8 @@ export const gameSlice = createSlice({
       )
 
       if (playerToUpdate !== -1) {
-        state.players.at(playerToUpdate)!.synergies = new Map(
-          entries(action.payload.value)
+        state.players.at(playerToUpdate)!.synergies = new Synergies(
+          new Map(entries(action.payload.value))
         )
       }
     },
@@ -204,22 +211,25 @@ export const gameSlice = createSlice({
         player.loadingProgress = action.payload.value
       }
     },
+    setGameMode: (state, action: PayloadAction<GameMode>) => {
+      state.gameMode = action.payload
+    },
     setWeather: (
       state,
       action: PayloadAction<{ value: Weather; id: string }>
     ) => {
-      if (state.currentSimulationId === action.payload.id) {
+      if (state.simulationIdSpectated === action.payload.id) {
         state.weather = action.payload.value
       }
     },
     setSimulation: (state, action: PayloadAction<Simulation>) => {
       if (
-        state.currentPlayerId === action.payload.bluePlayerId ||
-        state.currentPlayerId === action.payload.redPlayerId
+        state.playerIdSpectated === action.payload.bluePlayerId ||
+        state.playerIdSpectated === action.payload.redPlayerId
       ) {
-        state.currentSimulationId = action.payload.id
-        state.currentTeam =
-          state.currentPlayerId === action.payload.bluePlayerId
+        state.simulationIdSpectated = action.payload.id
+        state.teamSpectated =
+          state.playerIdSpectated === action.payload.bluePlayerId
             ? Team.BLUE_TEAM
             : Team.RED_TEAM
         state.weather = action.payload.weather
@@ -234,10 +244,10 @@ export const gameSlice = createSlice({
       }
     },
     setPlayer: (state, action: PayloadAction<IPlayer>) => {
-      state.currentPlayerId = action.payload.id
-      state.currentSimulationId = action.payload.simulationId
-      state.currentTeam = action.payload.team
-      state.currentPlayerSynergies = Array.from(action.payload.synergies)
+      state.playerIdSpectated = action.payload.id
+      state.simulationIdSpectated = action.payload.simulationId
+      state.teamSpectated = action.payload.team
+      state.synergiesSpectated = Array.from(action.payload.synergies)
     },
     addDpsMeter: (
       state,
@@ -247,7 +257,7 @@ export const gameSlice = createSlice({
       const dpsMeter =
         team === Team.BLUE_TEAM ? state.blueDpsMeter : state.redDpsMeter
       if (
-        state.currentSimulationId === id &&
+        state.simulationIdSpectated === id &&
         dpsMeter.find((d) => d.id == value.id) === undefined
       ) {
         dpsMeter.push(structuredClone(value))
@@ -267,7 +277,7 @@ export const gameSlice = createSlice({
       const { value, field, team, id, simulationId } = action.payload
       const dpsMeter =
         team === Team.BLUE_TEAM ? state.blueDpsMeter : state.redDpsMeter
-      if (state.currentSimulationId === simulationId) {
+      if (state.simulationIdSpectated === simulationId) {
         const index = dpsMeter.findIndex((e) => id == e.id)
         if (index >= 0) {
           dpsMeter[index][field] = value
@@ -277,12 +287,14 @@ export const gameSlice = createSlice({
 
     removeDpsMeter: (
       state,
-      action: PayloadAction<{ team: Team; simulationId: string }>
+      action: PayloadAction<{ id: string; team: Team; simulationId: string }>
     ) => {
-      const { team, simulationId } = action.payload
-      if (state.currentSimulationId === simulationId) {
-        if (team === Team.BLUE_TEAM) state.blueDpsMeter = new Array<IDps>()
-        if (team === Team.RED_TEAM) state.redDpsMeter = new Array<IDps>()
+      const { id, team, simulationId } = action.payload
+      if (state.simulationIdSpectated === simulationId) {
+        if (team === Team.BLUE_TEAM)
+          state.blueDpsMeter = state.blueDpsMeter.filter((dps) => dps.id !== id)
+        if (team === Team.RED_TEAM)
+          state.redDpsMeter = state.redDpsMeter.filter((dps) => dps.id !== id)
       }
     },
 
@@ -311,6 +323,7 @@ export const {
   setPlayer,
   setLife,
   setSynergies,
+  setGameMode,
   setRoundTime,
   setAfterGameId,
   setPhase,
@@ -323,6 +336,7 @@ export const {
   updateExperienceManager,
   setStreak,
   setInterest,
+  setMaxInterest,
   setMoney,
   setShopFreeRolls,
   setShopLocked,

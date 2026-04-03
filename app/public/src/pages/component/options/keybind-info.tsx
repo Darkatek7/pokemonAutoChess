@@ -16,14 +16,17 @@ export default function KeybindInfo() {
   useEffect(() => {
     function onKeydown(e: KeyboardEvent) {
       if (currentlyRemapping === null) return
+
+      // Prevent page scroll / focus movement while capturing keys (arrows, space, etc.)
+      e.preventDefault()
+      e.stopPropagation()
+
       let key = e.key.toUpperCase()
       if (key === "ESCAPE") {
         setCurrentlyRemapping(null)
         return
       }
-      if (key === " ") {
-        key = "SPACE"
-      }
+      key = KEY_CODES_TO_PHASER_KEY_CODES[key] ?? key
       setPreferences((old) => ({
         keybindings: { ...old.keybindings, [currentlyRemapping]: key }
       }))
@@ -41,7 +44,13 @@ export default function KeybindInfo() {
   }, [currentlyRemapping])
 
   const keys = Object.keys(preferences.keybindings)
-  const conflictingKeys = keys.filter((key, i) => keys.some((otherKey, otherIndex) => i !== otherIndex && preferences.keybindings[key] === preferences.keybindings[otherKey]))
+  const conflictingKeys = keys.filter((key, i) =>
+    keys.some(
+      (otherKey, otherIndex) =>
+        i !== otherIndex &&
+        preferences.keybindings[key] === preferences.keybindings[otherKey]
+    )
+  )
 
   const RemappableKey = ({ keyId }: { keyId: string }) => {
     return (
@@ -64,43 +73,87 @@ export default function KeybindInfo() {
         <dt>
           <RemappableKey keyId="sell" />
         </dt>
-        <dd>{t("key_desc_sell")}</dd>
+        <dd>{t("key_description.sell")}</dd>
 
         <dt>
           <RemappableKey keyId="buy_xp" />
         </dt>
-        <dd>{t("key_desc_buy_xp")}</dd>
+        <dd>{t("key_description.buy_xp")}</dd>
 
         <dt>
           <RemappableKey keyId="refresh" />
         </dt>
-        <dd>{t("key_desc_refresh")}</dd>
+        <dd>{t("key_description.refresh")}</dd>
 
         <dt>
           <RemappableKey keyId="lock" />
         </dt>
-        <dd>{t("key_desc_lock")}</dd>
+        <dd>{t("key_description.lock")}</dd>
+
+        <dt>
+          <RemappableKey keyId="camera_lock" />
+        </dt>
+        <dd>{t("key_description.camera_lock")}</dd>
 
         <dt>
           <RemappableKey keyId="switch" />
         </dt>
-        <dd>{t("key_desc_switch")}</dd>
+        <dd>{t("key_description.switch")}</dd>
 
         <dt>
           <RemappableKey keyId="emote" />
         </dt>
-        <dd>{t("key_desc_avatar_anim")}</dd>
+        <dd>{t("key_description.avatar_anim")}</dd>
+
+        <dt>
+          <RemappableKey keyId="prev_player" />
+        </dt>
+        <dd>{t("key_description.prev_player")}</dd>
+
+        <dt>
+          <RemappableKey keyId="next_player" />
+        </dt>
+        <dd>{t("key_description.next_player")}</dd>
+
+        <dt>
+          <RemappableKey keyId="board_return" />
+        </dt>
+        <dd>{t("key_description.board_return")}</dd>
+
+        <dt>
+          <RemappableKey keyId="wiki" />
+        </dt>
+        <dd>{t("key_description.wiki")}</dd>
+
+        <dt>
+          <RemappableKey keyId="team_planner" />
+        </dt>
+        <dd>{t("key_description.team_planner")}</dd>
 
         <dt>
           <kbd>Ctrl</kbd>
         </dt>
-        <dd>{t("key_desc_avatar_emotes")}</dd>
+        <dd>{t("key_description.avatar_emotes")}</dd>
 
         <dt>
           <kbd>Ctrl</kbd>+<kbd>1</kbd>..<kbd>9</kbd>
         </dt>
-        <dd>{t("key_desc_avatar_show_emote")} 1..9</dd>
+        <dd>{t("key_description.avatar_show_emote")} 1..9</dd>
       </dl>
+      <p>{t("click_on_keybind_to_change_it")}</p>
     </div>
   )
+}
+
+const KEY_CODES_TO_PHASER_KEY_CODES: { [key: string]: string } = {
+  " ": "SPACE",
+  PAGEUP: "PAGE_UP",
+  PAGEDOWN: "PAGE_DOWN",
+
+  // Normalize arrow keys from DOM KeyboardEvent format to Phaser key names
+  // e.g. "ArrowLeft" -> "ARROWLEFT" -> "LEFT"
+  ARROWUP: "UP",
+  ARROWDOWN: "DOWN",
+  ARROWLEFT: "LEFT",
+  ARROWRIGHT: "RIGHT"
 }

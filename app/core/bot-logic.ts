@@ -1,10 +1,29 @@
-import { app } from "firebase-admin"
+import { AdditionalPicksStages, PortalCarouselStages } from "../config"
+import {
+  computeSynergies,
+  getSynergyStep
+} from "../models/colyseus-models/synergies"
 import { IBot, IDetailledPokemon, IStep } from "../models/mongo-models/bot-v2"
+import PokemonFactory from "../models/pokemon-factory"
 import { getPokemonData } from "../models/precomputed/precomputed-pokemon-data"
-import { AdditionalPicksStages, PortalCarouselStages } from "../types/Config"
 import { Rarity } from "../types/enum/Game"
-import { CraftableItems, Item, ItemComponents } from "../types/enum/Item"
-import { Pkm, PkmDuos, PkmIndex } from "../types/enum/Pokemon"
+import {
+  CraftableItems,
+  Item,
+  ItemComponents,
+  Scarves,
+  Tools
+} from "../types/enum/Item"
+import { Passive } from "../types/enum/Passive"
+import {
+  NonPkm,
+  Pkm,
+  PkmDuos,
+  PkmFamily,
+  PkmIndex
+} from "../types/enum/Pokemon"
+import { Synergy } from "../types/enum/Synergy"
+import { isIn } from "../utils/array"
 import { logger } from "../utils/logger"
 import { clamp, min } from "../utils/number"
 
@@ -58,6 +77,7 @@ export const POWER_SCORE_BY_CATEGORY = {
   "UNIQUE T3": 4,
   "UNIQUE T4": 5,
   "UNIQUE T3 DUO": 3,
+  "LEGENDARY T2": 5,
   "LEGENDARY T3": 6,
   "LEGENDARY T4": 8,
   "LEGENDARY DUO": 4,
@@ -120,10 +140,13 @@ Object.values(Pkm).forEach((pkm) => {
 })
 
 export function getPowerScore(board: IDetailledPokemon[]): number {
-  return board.reduce((sum, pkm) => sum + getUnitPowerScore(pkm.name), 0)
+  return board
+    .filter((p) => p.y > 0)
+    .reduce((sum, pkm) => sum + getUnitPowerScore(pkm.name), 0)
 }
 
 export function getUnitPowerScore(pkm: Pkm): number {
+  if (NonPkm.includes(pkm)) return 0
   return POWER_SCORE_BY_CATEGORY[getCategory(pkm)] ?? 1
 }
 
@@ -144,16 +167,31 @@ export function getMaxItemComponents(stage: number): number {
 export function getNbComponentsOnBoard(board: IDetailledPokemon[]): number {
   return board
     .flatMap((pkm) => pkm.items)
-    .reduce(
-      (nbComponents: number, item: Item) =>
-        nbComponents +
-        (CraftableItems.includes(item)
-          ? 2
-          : ItemComponents.includes(item)
-            ? 1
-            : 0),
-      0
-    )
+    .reduce((total: number, item: Item) => {
+      let nbComponents = 0
+      if (Scarves.includes(item))
+        nbComponents = item === Item.NULLIFY_BANDANNA ? 0 : 1
+      else if (CraftableItems.includes(item)) nbComponents = 2
+      else if (ItemComponents.includes(item)) nbComponents = 1
+      return total + nbComponents
+    }, 0)
+}
+
+export function getNbScarvesOnBoard(board: IDetailledPokemon[]): number {
+  return board
+    .flatMap((pkm) => pkm.items)
+    .reduce((total: number, item: Item) => {
+      let nbScarves = 0
+      if (Scarves.includes(item))
+        nbScarves = item === Item.NULLIFY_BANDANNA ? 2 : 1
+      else if (item === Item.SILK_SCARF) nbScarves = 1
+      return total + nbScarves
+    }, 0)
+}
+
+export function getNbToolsOnBoard(board: IDetailledPokemon[]): number {
+  return board.flatMap((pkm) => pkm.items).filter((item) => isIn(Tools, item))
+    .length
 }
 
 export function rewriteBotRoundsRequiredto1(bot: IBot) {
@@ -167,7 +205,6 @@ export function rewriteBotRoundsRequiredto1(bot: IBot) {
       oneSteps.push({ board: step.board, roundsRequired: 1 })
     }
   })
-  bot = structuredClone(bot)
   bot.steps = oneSteps.slice(0, MAX_BOTS_STAGE + 1)
   return bot
 }
@@ -196,7 +233,22 @@ export function validateBot(bot: IBot): string[] {
   const errors: string[] = []
   for (let stage = 0; stage < bot.steps.length; stage++) {
     try {
-      validateBoard(bot.steps[stage].board, stage)
+      const board = bot.steps[stage].board
+      const synergies = computeSynergies(
+        board.map((p) => {
+          const pkm = PokemonFactory.createPokemonFromName(p.name, {
+            emotion: p.emotion,
+            shiny: p.shiny
+          })
+          pkm.positionX = p.x
+          pkm.positionY = p.y
+          p.items.forEach((item) => {
+            pkm.items.add(item)
+          })
+          return pkm
+        })
+      )
+      validateBoard(bot.steps[stage].board, stage, synergies)
     } catch (err) {
       errors.push(`Stage ${stage}: ${err}`)
     }
@@ -204,12 +256,30 @@ export function validateBot(bot: IBot): string[] {
   return errors
 }
 
-export function validateBoard(board: IDetailledPokemon[], stage: number) {
-  const team = board.map((p) => getPokemonData(p.name))
+export function validateBoard(
+  board: IDetailledPokemon[],
+  stage: number,
+  synergies: Map<Synergy, number>
+): void {
+  const team = board
+    .filter((p) => p.y > 0)
+    .map((p) => getPokemonData(p.name))
+    .filter((p) => p.passive !== Passive.INANIMATE)
   const items = getNbComponentsOnBoard(board)
   const maxItems = getMaxItemComponents(stage)
 
+  const scarves = getNbScarvesOnBoard(board)
+  const maxScarves = getSynergyStep(synergies, Synergy.NORMAL)
+
+  const nbToolsOnBoard = getNbToolsOnBoard(board)
+  const nbMaxToolsOnBoard = getSynergyStep(synergies, Synergy.ARTIFICIAL)
+
   const duos = Object.values(PkmDuos)
+
+  const numberOfGoldBows = board
+    .flatMap((p) => p.items)
+    .filter((item) => item === Item.GOLD_BOW).length
+  const maxTeamSize = 9 + numberOfGoldBows
 
   function removeDuoPartner(p, index, arr) {
     const duo = duos.find((duo) => duo.includes(p.name))
@@ -223,6 +293,16 @@ export function validateBoard(board: IDetailledPokemon[], stage: number) {
     return true
   }
 
+  function removeUniqueThatEvolveToLegendary(p) {
+    if (
+      getPokemonData(PkmFamily[p.name]).rarity === Rarity.UNIQUE &&
+      getPokemonData(p.name).rarity === Rarity.LEGENDARY
+    ) {
+      return false // remove unique that evolves to legendary
+    }
+    return true
+  }
+
   const uniques = team
     .filter((p) => p.rarity === Rarity.UNIQUE)
     .filter(removeDuoPartner)
@@ -230,11 +310,10 @@ export function validateBoard(board: IDetailledPokemon[], stage: number) {
   const legendaries = team
     .filter((p) => p.rarity === Rarity.LEGENDARY)
     .filter(removeDuoPartner)
+    .filter(removeUniqueThatEvolveToLegendary)
 
   const additionalUncommon = team.filter(
-    (p) =>
-      p.additional &&
-      (p.rarity === Rarity.UNCOMMON || p.rarity === Rarity.COMMON) // TEMP: common add picks should be moved to uncommon
+    (p) => p.additional && p.rarity === Rarity.UNCOMMON
   )
   const additionalRare = team.filter(
     (p) => p.additional && p.rarity === Rarity.RARE
@@ -244,12 +323,12 @@ export function validateBoard(board: IDetailledPokemon[], stage: number) {
     (p) => p.additional && p.rarity === Rarity.EPIC
   )
 
-  if (stage < PortalCarouselStages[0] && uniques.length > 0) {
+  if (stage < PortalCarouselStages[1] && uniques.length > 0) {
     throw new Error(
       `Unique Pokemons can't be played before stage ${PortalCarouselStages[1]}`
     )
   }
-  if (stage < PortalCarouselStages[1] && legendaries.length > 0) {
+  if (stage < PortalCarouselStages[2] && legendaries.length > 0) {
     throw new Error(
       `Legendary Pokemons can't be played before stage ${PortalCarouselStages[2]}`
     )
@@ -276,10 +355,16 @@ export function validateBoard(board: IDetailledPokemon[], stage: number) {
   if (legendaries.length > 1) {
     throw new Error(`Only one Legendary Pokemon can be played`)
   }
-  if (team.length > 9) {
-    throw new Error(`Maximum 9 Pokemon can be played in a team`)
+  if (team.length > maxTeamSize) {
+    throw new Error(`Too many Pokémon are being played in this team`)
   }
   if (items > maxItems) {
     throw new Error(`Too many item components are used at this stage`)
+  }
+  if (scarves > maxScarves) {
+    throw new Error(`Too many silk scarves are used in this team`)
+  }
+  if (nbToolsOnBoard > nbMaxToolsOnBoard) {
+    throw new Error(`Too many tools are used in this team`)
   }
 }

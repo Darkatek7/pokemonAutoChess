@@ -1,29 +1,32 @@
 import { t } from "i18next"
-import React, { useEffect, useState, useMemo } from "react"
-import ReactDOM from "react-dom"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Tab, TabList, TabPanel, Tabs } from "react-tabs"
-import { Tooltip } from "react-tooltip"
+import { RarityColor } from "../../../../../config"
 import { getPokemonData } from "../../../../../models/precomputed/precomputed-pokemon-data"
 import { PRECOMPUTED_POKEMONS_PER_RARITY } from "../../../../../models/precomputed/precomputed-rarity"
-import { RarityColor } from "../../../../../types/Config"
-import { Ability } from "../../../../../types/enum/Ability"
 import { Rarity } from "../../../../../types/enum/Game"
 import { Pkm, PkmFamily, PkmIndex } from "../../../../../types/enum/Pokemon"
 import { IPokemonData } from "../../../../../types/interfaces/PokemonData"
 import { groupBy } from "../../../../../utils/array"
 import { getPortraitSrc } from "../../../../../utils/avatar"
+import { usePreferences } from "../../../preferences"
 import { cc } from "../../utils/jsx"
-import { GamePokemonDetail } from "../game/game-pokemon-detail"
+import { GamePokemonDetailTooltip } from "../game/game-pokemon-detail"
+import {
+  filterPokemonsAccordingToPreferences,
+  PokemonFilters
+} from "../pokemon-filters/pokemon-filters"
+import PokemonPortrait from "../pokemon-portrait"
 import { PokemonTypeahead } from "../typeahead/pokemon-typeahead"
 import WikiPokemonDetail from "./wiki-pokemon-detail"
-import PokemonPortrait from "../pokemon-portrait"
 
 export default function WikiPokemons() {
   const { t } = useTranslation()
   const tabs = Object.values(Rarity) as Rarity[]
   const [selectedPkm, setSelectedPkm] = useState<Pkm | "">("")
   const [tabIndex, setTabIndex] = useState(0)
+
   useEffect(() => {
     if (selectedPkm) {
       setTabIndex(tabs.indexOf(getPokemonData(selectedPkm).rarity))
@@ -39,10 +42,13 @@ export default function WikiPokemons() {
         setTabIndex(index)
       }}
     >
-      <PokemonTypeahead
-        value={selectedPkm}
-        onChange={(pkm) => setSelectedPkm(pkm)}
-      />
+      <div className="filters">
+        <PokemonFilters />
+        <PokemonTypeahead
+          value={selectedPkm}
+          onChange={(pkm) => setSelectedPkm(pkm)}
+        />
+      </div>
       <TabList>
         {tabs.map((r) => {
           return (
@@ -77,16 +83,26 @@ export function WikiPokemon(props: {
   selected: Pkm | ""
   onSelect: (pkm: Pkm) => void
 }) {
+  const [preferences] = usePreferences()
   const pokemons = useMemo(
     () =>
-      (PRECOMPUTED_POKEMONS_PER_RARITY[props.rarity])
-        .filter((p) => p !== Pkm.DEFAULT)
-        .sort((a: Pkm, b: Pkm) => {
-          return PkmFamily[a] === PkmFamily[b]
-            ? getPokemonData(a).stars - getPokemonData(b).stars
-            : PkmIndex[PkmFamily[a]].localeCompare(PkmIndex[PkmFamily[b]])
-        }),
-    [props.rarity]
+      filterPokemonsAccordingToPreferences(
+        PRECOMPUTED_POKEMONS_PER_RARITY[props.rarity],
+        preferences
+      ).sort((a: Pkm, b: Pkm) => {
+        return PkmFamily[a] === PkmFamily[b]
+          ? getPokemonData(a).stars - getPokemonData(b).stars
+          : PkmIndex[PkmFamily[a]].localeCompare(PkmIndex[PkmFamily[b]])
+      }),
+    [
+      props.rarity,
+      preferences.showAdditionalPool,
+      preferences.showRegionalPool,
+      preferences.showSpecialPool,
+      preferences.showRegularPool,
+      preferences.showEvolutions,
+      preferences.showAltForms
+    ]
   ) as Pkm[]
 
   return (
@@ -116,14 +132,13 @@ export function WikiPokemon(props: {
 }
 
 export function WikiAllPokemons() {
-  const pokemons = Object.values(Pkm)
-    .filter((p) => p !== Pkm.DEFAULT)
+  const [preferences] = usePreferences()
+  const pokemons = filterPokemonsAccordingToPreferences(
+    Object.values(Pkm),
+    preferences
+  )
     .map((p) => getPokemonData(p))
     .sort((a, b) => a.stars - b.stars) // put first stage first
-    .filter((a, index, list) => {
-      if (a.skill === Ability.DEFAULT) return false // pokemons with no ability are not ready for the show
-      return true
-    })
 
   const pokemonsPerRarity = groupBy(pokemons, (p) => p.rarity)
   for (const rarity in pokemonsPerRarity) {
@@ -135,8 +150,6 @@ export function WikiAllPokemons() {
         : PkmIndex[PkmFamily[a.name]].localeCompare(PkmIndex[PkmFamily[b.name]])
     })
   }
-
-  const [hoveredPokemon, setHoveredPokemon] = useState<Pkm>()
 
   return (
     <>
@@ -154,10 +167,8 @@ export function WikiAllPokemons() {
                         additional: p.additional,
                         regional: p.regional
                       })}
-                      onMouseOver={() => {
-                        setHoveredPokemon(p.name)
-                      }}
-                      data-tooltip-id="pokemon-detail"
+                      data-tooltip-id="game-pokemon-detail-tooltip"
+                      data-tooltip-content={p.name}
                     >
                       <img src={getPortraitSrc(p.index)} />
                     </li>
@@ -168,13 +179,7 @@ export function WikiAllPokemons() {
           )
         })}
       </div>
-      {hoveredPokemon && <Tooltip
-        id="pokemon-detail"
-        className="custom-theme-tooltip game-pokemon-detail-tooltip"
-        float
-      >
-        <GamePokemonDetail pokemon={hoveredPokemon} />
-      </Tooltip>}
+      <GamePokemonDetailTooltip origin="wiki" />
     </>
   )
 }

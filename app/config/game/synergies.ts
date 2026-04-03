@@ -1,0 +1,132 @@
+import { Rarity } from "../../types/enum/Game"
+import { FishingRod, Item, ShinyItem } from "../../types/enum/Item"
+import { Synergy } from "../../types/enum/Synergy"
+
+export const SynergyTriggers: { [key in Synergy]: number[] } = {
+  [Synergy.NORMAL]: [3, 5, 7, 9],
+  [Synergy.GRASS]: [3, 5, 7, 9],
+  [Synergy.FIRE]: [2, 4, 6, 8],
+  [Synergy.WATER]: [3, 6, 9],
+  [Synergy.ELECTRIC]: [3, 5, 7],
+  [Synergy.FIGHTING]: [2, 4, 6, 8],
+  [Synergy.PSYCHIC]: [3, 5, 7],
+  [Synergy.DARK]: [3, 5, 7],
+  [Synergy.STEEL]: [2, 4, 6, 8],
+  [Synergy.GROUND]: [2, 4, 6, 8],
+  [Synergy.POISON]: [3, 5, 7],
+  [Synergy.DRAGON]: [3, 5, 7],
+  [Synergy.FIELD]: [3, 6, 9],
+  [Synergy.MONSTER]: [2, 4, 6, 8],
+  [Synergy.HUMAN]: [2, 4, 6],
+  [Synergy.AQUATIC]: [2, 4, 6, 8],
+  [Synergy.BUG]: [2, 4, 6, 8],
+  [Synergy.FLYING]: [2, 4, 6, 8],
+  [Synergy.FLORA]: [3, 4, 5, 6],
+  [Synergy.ROCK]: [2, 4, 6],
+  [Synergy.GHOST]: [2, 4, 6, 8],
+  [Synergy.FAIRY]: [2, 4, 6, 8],
+  [Synergy.ICE]: [2, 4, 6, 8],
+  [Synergy.FOSSIL]: [2, 4, 6],
+  [Synergy.SOUND]: [2, 4, 6],
+  [Synergy.ARTIFICIAL]: [2, 4, 6],
+  [Synergy.BABY]: [3, 5, 7],
+  [Synergy.LIGHT]: [2, 3, 4, 5],
+  [Synergy.WILD]: [2, 4, 6, 9],
+  [Synergy.AMORPHOUS]: [3, 5, 7],
+  [Synergy.GOURMET]: [3, 4, 5]
+}
+
+export const FishRarityProbability: {
+  [rod in FishingRod]: {
+    [key in Rarity]?: number
+  }
+} = {
+  [Item.OLD_ROD]: {
+    [Rarity.SPECIAL]: 0.55,
+    [Rarity.COMMON]: 0.35,
+    [Rarity.UNCOMMON]: 0.1,
+    [Rarity.RARE]: 0,
+    [Rarity.EPIC]: 0
+  },
+  [Item.GOOD_ROD]: {
+    [Rarity.SPECIAL]: 0.35,
+    [Rarity.COMMON]: 0.25,
+    [Rarity.UNCOMMON]: 0.3,
+    [Rarity.RARE]: 0.1,
+    [Rarity.EPIC]: 0
+  },
+  [Item.SUPER_ROD]: {
+    [Rarity.SPECIAL]: 0.35,
+    [Rarity.COMMON]: 0.05,
+    [Rarity.UNCOMMON]: 0.25,
+    [Rarity.RARE]: 0.25,
+    [Rarity.EPIC]: 0.1
+  }
+}
+
+export const MONSTER_ATTACK_BUFF_PER_SYNERGY_LEVEL = [3, 6, 10, 10]
+export const MONSTER_AP_BUFF_PER_SYNERGY_LEVEL = [10, 20, 30, 30]
+export const MONSTER_MAX_HP_BUFF_FACTOR_PER_SYNERGY_LEVEL = [0.2, 0.4, 0.6, 0.6]
+
+export const FIELD_HEAL_PER_SYNERGY_LEVEL = [30, 40, 50]
+export const FIELD_SPEED_BUFF_PER_SYNERGY_LEVEL = [15, 20, 25]
+
+export const UNOWN_ENCOUNTER_CHANCE = 0.033
+export const SHINY_UNOWN_ENCOUNTER_CHANCE = 0.05
+export const SHARDS_PER_UNOWN_WANDERER = 50
+export const SHARDS_PER_SHINY_UNOWN_WANDERER = 250
+
+export const GOLDEN_BERRY_TREE_TYPES = [
+  Item.GOLDEN_RAZZ_BERRY,
+  Item.GOLDEN_NANAB_BERRY,
+  Item.GOLDEN_PINAP_BERRY
+]
+
+export const GoldenEggItems = [
+  Item.DYNAMAX_BAND,
+  Item.SHINY_STONE,
+  Item.RARE_CANDY,
+  Item.EVIOLITE,
+  Item.WHITE_FLUTE,
+  Item.GOLD_BOTTLE_CAP,
+  Item.ABSORB_BULB,
+  Item.SACRED_ASH,
+  Item.COMET_SHARD,
+  Item.REPEAT_BALL,
+  Item.GOLD_BOW
+] satisfies ShinyItem[]
+
+// Synergy color mapping extracted from SVG fill colors
+export const SYNERGY_COLORS: Record<Synergy, `#${string}`> = {
+  NORMAL: "#FEFEFE",
+  FIRE: "#FF9024",
+  WATER: "#2DA2FD",
+  GRASS: "#17B300",
+  ELECTRIC: "#FDFF4A",
+  ICE: "#C3E4EE",
+  FIGHTING: "#F33218",
+  POISON: "#88D7A0",
+  GROUND: "#C6964A",
+  FLYING: "#B2E9FF",
+  PSYCHIC: "#B955D2",
+  BUG: "#FFFE66",
+  ROCK: "#E7E5AF",
+  GHOST: "#876DAD",
+  DRAGON: "#B87333",
+  DARK: "#A6A6A6",
+  STEEL: "#DBDBDB",
+  FAIRY: "#FFAFD1",
+  FIELD: "#DE8A4E",
+  AQUATIC: "#14C8C8",
+  MONSTER: "#00B464",
+  AMORPHOUS: "#E5B2F4",
+  WILD: "#B22334",
+  SOUND: "#FF6095",
+  FLORA: "#FF60F1",
+  BABY: "#FFD79A",
+  HUMAN: "#FDBB8B",
+  LIGHT: "#FFF896",
+  GOURMET: "#FF8473",
+  FOSSIL: "#D2D35B",
+  ARTIFICIAL: "#EDEDED"
+}

@@ -1,28 +1,35 @@
-import path from "path"
 import { monitor } from "@colyseus/monitor"
-import config from "@colyseus/tools"
-import { uWebSocketsTransport } from "@colyseus/uwebsockets-transport"
-import uWebSockets from "uWebSockets.js"
 import {
-  Presence,
+  defineRoom,
+  defineServer,
+  matchMaker,
   RedisDriver,
   RedisPresence,
-  ServerOptions,
-  matchMaker
+  ServerOptions
 } from "colyseus"
-import helmet from "helmet"
 import cors from "cors"
 import express, { ErrorRequestHandler } from "express"
 import basicAuth from "express-basic-auth"
 import admin from "firebase-admin"
+import { UserRecord } from "firebase-admin/lib/auth/user-record"
+import helmet from "helmet"
 import { connect } from "mongoose"
+import path from "path"
 import pkg from "../package.json"
+import {
+  MAX_CONCURRENT_PLAYERS_ON_SERVER,
+  SynergyTriggers,
+  USERNAME_REGEXP
+} from "./config"
+import { migrateShardsOfAltForms } from "./core/collection"
 import { initTilemap } from "./core/design"
 import { GameRecord } from "./models/colyseus-models/game-record"
+import chatV2 from "./models/mongo-models/chat-v2"
 import DetailledStatistic from "./models/mongo-models/detailled-statistic-v2"
-import Meta from "./models/mongo-models/meta"
 import TitleStatistic from "./models/mongo-models/title-statistic"
-import UserMetadata from "./models/mongo-models/user-metadata"
+import UserMetadata, {
+  toUserMetadataJSON
+} from "./models/mongo-models/user-metadata"
 import { PRECOMPUTED_POKEMONS_PER_TYPE } from "./models/precomputed/precomputed-types"
 import AfterGameRoom from "./rooms/after-game-room"
 import CustomLobbyRoom from "./rooms/custom-lobby-room"
@@ -32,29 +39,37 @@ import {
   addBotToDatabase,
   approveBot,
   deleteBotFromDatabase,
-  getBotData,
-  getBotsList
+  fetchBot,
+  fetchBotsList
 } from "./services/bots"
 import { getLeaderboard } from "./services/leaderboard"
-import { getMetadata, getMetaItems, getMetaPokemons } from "./services/meta"
 import {
-  MAX_CONCURRENT_PLAYERS_ON_SERVER,
-  MAX_POOL_CONNECTIONS_SIZE,
-  SynergyTriggers
-} from "./types/Config"
+  computeSynergyAverages,
+  getDendrogram,
+  getMetadata,
+  getMetaItems,
+  getMetaPokemons,
+  getMetaRegions,
+  getMetaV2
+} from "./services/meta"
+import { ISuggestionUser, Role } from "./types"
 import { DungeonPMDO } from "./types/enum/Dungeon"
 import { Item } from "./types/enum/Item"
 import { Pkm, PkmIndex } from "./types/enum/Pokemon"
 import { logger } from "./utils/logger"
-import chatV2 from "./models/mongo-models/chat-v2"
-import { UserRecord } from "firebase-admin/lib/auth/user-record"
-import { Role } from "./types"
-import { BotV2 } from "./models/mongo-models/bot-v2"
 
 const clientSrc = __dirname.includes("server")
   ? path.join(__dirname, "..", "..", "client")
   : path.join(__dirname, "public", "dist", "client")
 const viewsSrc = path.join(clientSrc, "index.html")
+const isDevelopment = process.env.MODE === "dev"
+const setCacheControl = (res: any, maxAge: number = 86400) => {
+  if (!isDevelopment) {
+    res.set("Cache-Control", `max-age=${maxAge}`)
+  } else {
+    res.set("Cache-Control", "no-cache")
+  }
+}
 
 /**
  * Import your Room files
@@ -64,11 +79,9 @@ let gameOptions: ServerOptions = {}
 
 if (process.env.NODE_APP_INSTANCE) {
   const processNumber = Number(process.env.NODE_APP_INSTANCE || "0")
-  const port = (Number(process.env.PORT) || 2567) + processNumber
+  const port = (Number(process.env.PORT) || 2569) + processNumber
   gameOptions = {
-    presence: new RedisPresence(
-      process.env.REDIS_URI
-    ) as Presence /* TODO: type assertion shouldnt be required, need to report that bug to colyseus */,
+    presence: new RedisPresence(process.env.REDIS_URI),
     driver: new RedisDriver(process.env.REDIS_URI),
     publicAddress: `${port}.${process.env.SERVER_NAME}`,
     selectProcessIdToCreateRoom: async function (
@@ -94,33 +107,34 @@ if (process.env.NODE_APP_INSTANCE) {
       }
     }
   }
+  gameOptions.presence?.setMaxListeners(100) // extend max listeners to avoid memory leak warning
 }
 
-if (process.env.MODE === "dev") {
+/*if (process.env.MODE === "dev") {
   gameOptions.devMode = true
-}
+}*/
 
-export default config({
-  options: gameOptions,
+export const server = defineServer({
+  ...gameOptions,
 
-  // uWebSockets caused many issues unfortunately, reverting to WebSocketTransport for now
-  /*initializeTransport: function () {
+  /* uWebSockets turned out to be unstable in production, so we are using the default transport
+  2025-06-29T16:50:08: Error: Invalid access of closed uWS.WebSocket/SSLWebSocket.
+  
+  initializeTransport: function () {
     return new uWebSocketsTransport({
-      compression: uWebSockets.SHARED_COMPRESSOR
+      compression: uWebSockets.SHARED_COMPRESSOR,
+      idleTimeout: 0, // disable idle timeout
     })
   },*/
 
-  initializeGameServer: (gameServer) => {
-    /**
-     * Define your room handlers:
-     */
-    gameServer.define("after-game", AfterGameRoom)
-    gameServer.define("lobby", CustomLobbyRoom)
-    gameServer.define("preparation", PreparationRoom).enableRealtimeListing()
-    gameServer.define("game", GameRoom).enableRealtimeListing()
+  rooms: {
+    "after-game": defineRoom(AfterGameRoom),
+    lobby: defineRoom(CustomLobbyRoom),
+    preparation: defineRoom(PreparationRoom).enableRealtimeListing(),
+    game: defineRoom(GameRoom).enableRealtimeListing()
   },
 
-  initializeExpress: (app) => {
+  express: (app) => {
     /**
      * Bind your custom express routes here:
      * Read more: https://expressjs.com/en/starter/basic-routing.html
@@ -138,22 +152,26 @@ export default config({
               "https://*.firebaseapp.com",
               "https://apis.google.com",
               "https://*.googleapis.com",
+              "https://*.doubleclick.net", // google ads, required for youtube embedded
               "https://*.githubusercontent.com",
               "http://raw.githubusercontent.com",
+              "https://api.github.com",
               "https://*.youtube.com",
               "https://pokemon.darkatek7.com",
               "https://eternara.site",
               "https://www.penumbra-autochess.com",
               "https://pokechess.com.br",
               "https://uruwhy.online",
-              "https://koala-pac.com"
+              "https://koala-pac.com",
+              "https://pokev9.52kx.net"
             ],
             scriptSrc: [
               "'self'",
               "'unsafe-inline'",
               "'unsafe-eval'",
               "https://apis.google.com",
-              "https://*.googleapis.com"
+              "https://*.googleapis.com",
+              "https://*.doubleclick.net" // google ads, required for youtube embedded
             ],
             imgSrc: [
               "'self'",
@@ -219,6 +237,10 @@ export default config({
       res.sendFile(viewsSrc)
     })
 
+    app.get("/translations", (req, res) => {
+      res.sendFile(viewsSrc)
+    })
+
     app.get("/pokemons", (req, res) => {
       res.send(Pkm)
     })
@@ -239,57 +261,113 @@ export default config({
       res.send(SynergyTriggers)
     })
 
-    app.get("/meta", async (req, res) => {
-      res.set("Cache-Control", "no-cache")
-      res.send(
-        await Meta.find({}, [
-          "cluster_id",
-          "count",
-          "ratio",
-          "winrate",
-          "mean_rank",
-          "types",
-          "pokemons",
-          "x",
-          "y"
-        ])
-      )
-    })
-
     app.get("/titles", async (req, res) => {
       res.send(await TitleStatistic.find().sort({ name: 1 }).exec()) // Ensure a consistent order by sorting on a unique field
     })
 
     app.get("/meta/metadata", async (req, res) => {
       // Set Cache-Control header for 24 hours (86400 seconds)
-      res.set("Cache-Control", "max-age=86400")
+      setCacheControl(res, 86400)
       res.send(getMetadata())
     })
 
     app.get("/meta/items", async (req, res) => {
       // Set Cache-Control header for 24 hours (86400 seconds)
-      res.set("Cache-Control", "max-age=86400")
+      setCacheControl(res, 86400)
       res.send(getMetaItems())
     })
 
     app.get("/meta/pokemons", async (req, res) => {
       // Set Cache-Control header for 24 hours (86400 seconds)
-      res.set("Cache-Control", "max-age=86400")
+      setCacheControl(res, 86400)
       res.send(getMetaPokemons())
     })
 
+    app.get("/meta/regions", async (req, res) => {
+      // Set Cache-Control header for 24 hours (86400 seconds)
+      setCacheControl(res, 86400)
+      res.send(getMetaRegions())
+    })
+
+    app.get("/meta-v2", async (req, res) => {
+      // Set Cache-Control header for 24 hours (86400 seconds)
+      setCacheControl(res, 86400)
+      res.send(getMetaV2())
+    })
+
+    app.get("/dendrogram", async (req, res) => {
+      // Set Cache-Control header for 24 hours (86400 seconds)
+      setCacheControl(res, 86400)
+      res.send(getDendrogram())
+    })
+
+    app.get("/meta/types", async (req, res) => {
+      const userAuth = await authUser(req, res)
+      if (!userAuth) return
+      const user = await UserMetadata.findOne({ uid: userAuth.uid })
+      if (!user || user.role !== Role.ADMIN) {
+        res.status(403).send("Unauthorized")
+        return
+      }
+
+      res.send(computeSynergyAverages())
+    })
+
     app.get("/tilemap/:map", async (req, res) => {
-      const tilemap = initTilemap(req.params.map as DungeonPMDO)
-      res.send(tilemap)
+      try {
+        if (
+          !req.params.map ||
+          !Object.values(DungeonPMDO).includes(req.params.map as DungeonPMDO)
+        ) {
+          return res.status(400).send({ error: "Invalid map parameter" })
+        }
+        const tilemap = initTilemap(req.params.map as DungeonPMDO)
+        res.send(tilemap)
+      } catch (error) {
+        logger.error("Error generating tilemap", { error, map: req.params.map })
+        res.status(500).send({ error: "Error generating tilemap" })
+      }
     })
 
     app.get("/leaderboards", async (req, res) => {
-      res.set("Cache-Control", "no-cache")
+      if (!isDevelopment) {
+        res.set("Cache-Control", "no-cache")
+      }
       res.send(getLeaderboard())
     })
 
+    app.get("/leaderboards/bots", async (req, res) => {
+      if (!isDevelopment) {
+        res.set("Cache-Control", "no-cache")
+      }
+      res.send(getLeaderboard()?.botLeaderboard)
+    })
+
+    app.get("/leaderboards/elo", async (req, res) => {
+      if (!isDevelopment) {
+        res.set("Cache-Control", "no-cache")
+      }
+      res.send(getLeaderboard()?.leaderboard)
+    })
+
+    app.get("/leaderboards/level", async (req, res) => {
+      if (!isDevelopment) {
+        res.set("Cache-Control", "no-cache")
+      }
+      res.send(getLeaderboard()?.levelLeaderboard)
+    })
+
+    app.get("/leaderboards/event", async (req, res) => {
+      if (!isDevelopment) {
+        res.set("Cache-Control", "no-cache")
+      }
+      res.send(getLeaderboard()?.eventLeaderboard)
+    })
+
     app.get("/game-history/:playerUid", async (req, res) => {
-      res.set("Cache-Control", "no-cache")
+      if (!isDevelopment) {
+        res.set("Cache-Control", "no-cache")
+      }
       const { playerUid } = req.params
       const { page = 1 } = req.query
       const limit = 10
@@ -321,7 +399,9 @@ export default config({
     })
 
     app.get("/chat-history/:playerUid", async (req, res) => {
-      res.set("Cache-Control", "no-cache")
+      if (!isDevelopment) {
+        res.set("Cache-Control", "no-cache")
+      }
       const { playerUid } = req.params
       const { page = 1 } = req.query
       const limit = 30
@@ -334,19 +414,70 @@ export default config({
       return res.status(200).json(messages ?? [])
     })
 
+    app.get("/players", async (req, res) => {
+      try {
+        const searchTerm = req.query?.name?.toString().trim() || ""
+        // Escape regex special chars to prevent injection/ReDoS
+        const escapedTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
+        const userAuth = await authUser(req, res)
+        if (!userAuth) return
+        const user = await UserMetadata.findOne({ uid: userAuth.uid })
+        const showBanned =
+          user?.role === Role.ADMIN || user?.role === Role.MODERATOR
+
+        const users = await UserMetadata.find(
+          {
+            displayName: { $regex: `^${escapedTerm}` }, // ^ makes it a prefix match, enabling index use
+            ...(showBanned ? {} : { banned: false })
+          },
+          [
+            "uid",
+            "elo",
+            "displayName",
+            "level",
+            "avatar",
+            ...(showBanned ? ["banned"] : [])
+          ],
+          {
+            limit: 100,
+            sort: { level: -1 },
+            collation: { locale: "en", strength: 2 } // must match the index collation
+          }
+        )
+
+        if (users) {
+          const suggestions: Array<ISuggestionUser> = users.map((u) => {
+            return {
+              id: u.uid,
+              elo: u.elo,
+              name: u.displayName,
+              level: u.level,
+              avatar: u.avatar,
+              banned: u.banned
+            }
+          })
+          res.status(200).json(suggestions)
+        }
+      } catch (error) {
+        logger.error(error)
+        res.status(500).json({ error: "Error fetching players" })
+      }
+    })
+
     app.get("/bots", async (req, res) => {
-      const botsData = await getBotsList(
+      const approved =
         req.query.approved === "true"
           ? true
           : req.query.approved === "false"
             ? false
             : undefined
-      )
+      const botsData = await fetchBotsList(approved, req.query.pkm?.toString())
       res.send(botsData)
     })
 
     app.get("/bots/:id", async (req, res) => {
-      res.send(await getBotData(req.params.id))
+      res.send(await fetchBot(req.params.id))
     })
 
     const authUser = async (req, res): Promise<UserRecord | null> => {
@@ -368,10 +499,29 @@ export default config({
       }
     }
 
-    app.post("/bots", async (req, res) => {
-      const user = await authUser(req, res)
-      if (!user) return
+    app.get("/profile", async (req, res) => {
       try {
+        const userAuth = await authUser(req, res)
+        if (!userAuth) return
+        const mongoUser = await UserMetadata.findOne({ uid: userAuth.uid })
+        if (!mongoUser) return res.status(404).send("User not found")
+        await migrateShardsOfAltForms(mongoUser) // TEMPORARY migration; to be removed in future
+        if (!isDevelopment) {
+          res.set("Cache-Control", "no-cache")
+        }
+        res.send(toUserMetadataJSON(mongoUser))
+      } catch (error) {
+        logger.error("Error fetching profile", error)
+        res.status(500).send("Error fetching profile")
+      }
+    })
+
+    app.post("/bots", async (req, res) => {
+      try {
+        const userAuth = await authUser(req, res)
+        if (!userAuth) return
+        const user = await UserMetadata.findOne({ uid: userAuth.uid })
+        if (!user) return
         const bot = req.body
         bot.author = user.displayName
         const botAdded = addBotToDatabase(bot)
@@ -383,9 +533,9 @@ export default config({
     })
 
     app.delete("/bots/:id", async (req, res) => {
-      const userRecord = await authUser(req, res)
-      if (!userRecord) return
-      const user = await UserMetadata.findOne({ uid: userRecord.uid })
+      const userAuth = await authUser(req, res)
+      if (!userAuth) return
+      const user = await UserMetadata.findOne({ uid: userAuth.uid })
       if (
         !user ||
         (user.role !== Role.BOT_MANAGER && user.role !== Role.ADMIN)
@@ -429,6 +579,72 @@ export default config({
       }
     })
 
+    app.get("/moderation/chat-search", async (req, res) => {
+      const userAuth = await authUser(req, res)
+      if (!userAuth) return
+      const user = await UserMetadata.findOne({ uid: userAuth.uid })
+      if (!user || (user.role !== Role.ADMIN && user.role !== Role.MODERATOR)) {
+        res.status(403).send("Unauthorized")
+        return
+      }
+      const query = req.query.query?.toString().trim()
+      if (!query || query.length < 2) {
+        return res
+          .status(400)
+          .json({ error: "Query must be at least 2 characters" })
+      }
+      // Escape regex special chars to prevent injection/ReDoS
+      const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      try {
+        const messages = await chatV2
+          .find({ payload: { $regex: escapedQuery } }, undefined, {
+            limit: 50,
+            sort: { time: -1 }
+          })
+          .lean()
+        res.status(200).json(messages)
+      } catch (error) {
+        logger.error("Error searching chat messages", error)
+        res.status(500).json({ error: "Error searching messages" })
+      }
+    })
+
+    app.post("/moderation/rename-account", async (req, res) => {
+      const userAuth = await authUser(req, res)
+      if (!userAuth) return
+      const caller = await UserMetadata.findOne({ uid: userAuth.uid })
+      if (
+        !caller ||
+        (caller.role !== Role.ADMIN && caller.role !== Role.MODERATOR)
+      ) {
+        res.status(403).send("Unauthorized")
+        return
+      }
+      const { uid, newName } = req.body
+      if (!uid || typeof uid !== "string") {
+        return res.status(400).json({ error: "uid is required" })
+      }
+      if (!newName || typeof newName !== "string") {
+        return res.status(400).json({ error: "newName is required" })
+      }
+      if (!USERNAME_REGEXP.test(newName)) {
+        return res.status(400).json({ error: "Invalid name format" })
+      }
+      try {
+        const target = await UserMetadata.findOne({ uid })
+        if (!target) return res.status(404).json({ error: "User not found" })
+        target.displayName = newName
+        await target.save()
+        logger.info(
+          `${userAuth.displayName} renamed account ${uid} to ${newName}`
+        )
+        res.status(200).json({ displayName: newName })
+      } catch (error) {
+        logger.error("Error renaming account", error)
+        res.status(500).json({ error: "Error renaming account" })
+      }
+    })
+
     app.get("/status", async (req, res) => {
       const ccu = await matchMaker.stats.getGlobalCCU()
       const version = pkg.version
@@ -460,7 +676,6 @@ export default config({
      * Before before gameServer.listen() is called.
      */
     connect(process.env.MONGO_URI!, {
-      maxPoolSize: MAX_POOL_CONNECTIONS_SIZE,
       socketTimeoutMS: 45000
     })
     admin.initializeApp({

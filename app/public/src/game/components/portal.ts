@@ -25,17 +25,20 @@ export class SynergySymbol
 {
   id: string
   synergy: Synergy
+  portalId: string
 
   constructor(
     scene: Phaser.Scene,
     id: string,
     x: number,
     y: number,
-    synergy: Synergy
+    synergy: Synergy,
+    portalId: string
   ) {
     super(scene, x, y, "types", synergy + ".png")
     this.id = id
     this.synergy = synergy
+    this.portalId = portalId
     this.setDepth(DEPTH.INANIMATE_OBJECTS)
     this.scene.add.existing(this)
   }

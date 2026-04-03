@@ -1,8 +1,8 @@
 import React, { useMemo } from "react"
 import { useTranslation } from "react-i18next"
+import { RarityColor } from "../../../../../config"
 import PokemonFactory from "../../../../../models/pokemon-factory"
 import { getPokemonData } from "../../../../../models/precomputed/precomputed-pokemon-data"
-import { RarityColor } from "../../../../../types/Config"
 import { Ability } from "../../../../../types/enum/Ability"
 import { Stat } from "../../../../../types/enum/Game"
 import { Passive } from "../../../../../types/enum/Passive"
@@ -15,17 +15,34 @@ import SynergyIcon from "../icons/synergy-icon"
 import Credits from "./Credits"
 import "./wiki-pokemon-detail.css"
 
-export default function WikiPokemonDetail(props: { pokemon: Pkm, selectPkm: (pkm: Pkm) => void }) {
+export default function WikiPokemonDetail(props: {
+  pokemon: Pkm
+  selectPkm: (pkm: Pkm) => void
+}) {
   const { t } = useTranslation()
-  const pokemon = useMemo(
-    () => PokemonFactory.createPokemonFromName(props.pokemon),
-    [props.pokemon]
-  )
+  const pokemon = useMemo(() => {
+    const pokemon = PokemonFactory.createPokemonFromName(props.pokemon)
+    pokemon.pp = pokemon.maxPP
+    return pokemon
+  }, [props.pokemon])
   const pokemonData = useMemo(
     () => getPokemonData(props.pokemon),
     [props.pokemon]
   )
-  const evolutions = pokemonData.evolution ? [pokemonData.evolution] : pokemonData.evolutions
+  const evolutions = pokemonData.evolution
+    ? [pokemonData.evolution]
+    : pokemonData.evolutions
+
+  const prevolution = useMemo(() => {
+    const allPkm = Object.values(Pkm)
+    for (const pkm of allPkm) {
+      const data = getPokemonData(pkm)
+      if (data.evolution === props.pokemon) return pkm
+      if (data.evolutions?.includes(props.pokemon)) return pkm
+    }
+    return null
+  }, [props.pokemon])
+
   const statProp: Record<Stat, string> = {
     [Stat.ATK]: "atk",
     [Stat.DEF]: "def",
@@ -39,13 +56,13 @@ export default function WikiPokemonDetail(props: { pokemon: Pkm, selectPkm: (pkm
     [Stat.PP]: "maxPP",
     [Stat.AP]: "ap",
     [Stat.SHIELD]: "shield",
-    [Stat.LUCK]: "luck",
+    [Stat.LUCK]: "luck"
   }
 
   return (
     <div className="wiki-pokemon-detail">
       <div className="game-pokemon-detail-tooltip my-box">
-        <GamePokemonDetail pokemon={pokemon} />
+        <GamePokemonDetail pokemon={pokemon} origin="wiki" />
       </div>
       <dl>
         <dt>{t("name")}</dt>
@@ -57,7 +74,11 @@ export default function WikiPokemonDetail(props: { pokemon: Pkm, selectPkm: (pkm
           {t(`rarity.${pokemonData.rarity}`)}
         </dd>
         <dt>{t("pool_label")}</dt>
-        <dd>{t(`pool.${pokemonData.regional ? 'regional' : pokemonData.additional ? 'additional' : 'regular'}`)}</dd>
+        <dd>
+          {t(
+            `pool.${pokemonData.regional ? "regional" : pokemonData.additional ? "additional" : "regular"}`
+          )}
+        </dd>
         <dt style={{ verticalAlign: "middle" }}>{t("tier")}</dt>
         <dd>
           {Array.from({ length: pokemonData.stars }, (_, i) => (
@@ -70,23 +91,41 @@ export default function WikiPokemonDetail(props: { pokemon: Pkm, selectPkm: (pkm
             <SynergyIcon key={"img" + type} type={type} />
           ))}
         </dd>
+        {prevolution && (
+          <>
+            <dt>{t("evolves_from")}</dt>
+            <dd>
+              <div
+                onClick={() => props.selectPkm(prevolution)}
+                style={{ cursor: "pointer" }}
+              >
+                <img
+                  src={getPortraitSrc(PkmIndex[prevolution])}
+                  style={{ marginRight: "0.5em" }}
+                />
+                <span className="pokemon-name">{t(`pkm.${prevolution}`)}</span>
+              </div>
+            </dd>
+          </>
+        )}
         <dt>{t("evolution")}</dt>
         <dd>
-          {evolutions.length === 0 ? (
-            "No evolution"
-          ) : (evolutions.map((evolution) => (
-            <div key={evolution} onClick={() => props.selectPkm(evolution)} style={{ cursor: "pointer" }}>
-              <img
-                src={getPortraitSrc(PkmIndex[evolution])}
-                style={{ marginRight: "0.5em" }}
-              />
-              <span className="pokemon-name">
-                {t(`pkm.${evolution}`)}
-              </span>
-            </div>))
-          )}
+          {evolutions.length === 0
+            ? "No evolution"
+            : evolutions.map((evolution) => (
+                <div
+                  key={evolution}
+                  onClick={() => props.selectPkm(evolution)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <img
+                    src={getPortraitSrc(PkmIndex[evolution])}
+                    style={{ marginRight: "0.5em" }}
+                  />
+                  <span className="pokemon-name">{t(`pkm.${evolution}`)}</span>
+                </div>
+              ))}
         </dd>
-
         <dt>{t("portrait_credit")}</dt>
         <Credits for="portrait" index={pokemonData.index} />
 
@@ -94,17 +133,23 @@ export default function WikiPokemonDetail(props: { pokemon: Pkm, selectPkm: (pkm
         <Credits for="sprite" index={pokemonData.index} />
       </dl>
       <dl>
-        {[Stat.HP, Stat.PP, Stat.RANGE, Stat.ATK, Stat.SPEED, Stat.DEF, Stat.SPE_DEF].map(
-          (stat) => (
-            <React.Fragment key={stat}>
-              <dt>
-                <img src={`assets/icons/${stat}.png`} alt="" />{" "}
-                {t(`stat.${stat}`)}
-              </dt>
-              <dd>{pokemon[statProp[stat]]}</dd>
-            </React.Fragment>
-          )
-        )}
+        {[
+          Stat.HP,
+          Stat.PP,
+          Stat.RANGE,
+          Stat.ATK,
+          Stat.SPEED,
+          Stat.DEF,
+          Stat.SPE_DEF
+        ].map((stat) => (
+          <React.Fragment key={stat}>
+            <dt>
+              <img src={`assets/icons/${stat}.png`} alt="" />{" "}
+              {t(`stat.${stat}`)}
+            </dt>
+            <dd>{pokemon[statProp[stat]]}</dd>
+          </React.Fragment>
+        ))}
       </dl>
       <dl>
         {pokemonData.skill !== Ability.DEFAULT && (
@@ -114,7 +159,7 @@ export default function WikiPokemonDetail(props: { pokemon: Pkm, selectPkm: (pkm
               {t(`ability.${pokemon.skill}`)}
               <AbilityTooltip
                 ability={pokemonData.skill}
-                stats={{ ap: 0, luck: 0, stars: pokemonData.stars, stages: 3 }}
+                stats={{ ap: 0, luck: 0, stars: pokemonData.stars, stages: 4 }}
               />
             </dd>
           </>

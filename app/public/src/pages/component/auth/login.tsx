@@ -3,13 +3,13 @@ import "firebase/compat/auth"
 import React, { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
-import { useAppDispatch, useAppSelector } from "../../../hooks"
+import { FIREBASE_CONFIG } from "../../../../../config"
+import { throttle } from "../../../../../utils/function"
 import { joinLobbyRoom } from "../../../game/lobby-logic"
+import { useAppDispatch, useAppSelector } from "../../../hooks"
 import { logIn, logOut } from "../../../stores/NetworkStore"
-import { FIREBASE_CONFIG } from "../../utils/utils"
 //import AnonymousButton from "./anonymous-button"
 import { StyledFirebaseAuth } from "./styled-firebase-auth"
-import { throttle } from "../../../../../utils/function"
 
 import "firebaseui/dist/firebaseui.css"
 import "./login.css"
@@ -20,7 +20,9 @@ export default function Login() {
   const navigate = useNavigate()
   const uid = useAppSelector((state) => state.network.uid)
   const displayName = useAppSelector((state) => state.network.displayName)
+  const email = useAppSelector((state) => state.network.email)
   const [prejoining, setPrejoining] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   const preJoinLobby = throttle(async function prejoin() {
     setPrejoining(true)
@@ -76,7 +78,9 @@ export default function Login() {
       <div id="play-panel">
         <p>
           {t("authenticated_as")}:{" "}
-          <span title={displayName}>{t("hover_to_reveal")}</span>
+          <span title={`${displayName}${email ? ` (${email})` : ""}`}>
+            {t("hover_to_reveal")}
+          </span>
         </p>
         <ul className="actions">
           <li>
@@ -91,12 +95,18 @@ export default function Login() {
           <li>
             <button
               className="bubbly red"
-              onClick={() => {
-                firebase.auth().signOut()
-                dispatch(logOut())
+              disabled={prejoining || loggingOut}
+              onClick={async () => {
+                setLoggingOut(true)
+                try {
+                  await firebase.auth().signOut()
+                  dispatch(logOut())
+                } finally {
+                  setLoggingOut(false)
+                }
               }}
             >
-              {t("sign_out")}
+              {loggingOut ? t("signing_out") : t("sign_out")}
             </button>
           </li>
         </ul>

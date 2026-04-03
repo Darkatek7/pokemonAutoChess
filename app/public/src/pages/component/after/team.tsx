@@ -1,4 +1,3 @@
-import React from "react"
 import { ArraySchema } from "@colyseus/schema"
 import { IPokemonRecord } from "../../../../../models/colyseus-models/game-record"
 import PokemonPortrait from "../pokemon-portrait"
@@ -12,12 +11,18 @@ export default function Team(props: {
       {props.team.map((p, index) => {
         return (
           <li key={index}>
-            <PokemonPortrait avatar={p.avatar} />
+            <PokemonPortrait
+              avatar={p.avatar}
+              data-tooltip-id="game-pokemon-detail-tooltip"
+              data-tooltip-content={p.name}
+            />
             <div className="pokemon-items">
               {p.items.map((item, i) => (
                 <img
                   key={i}
                   src={"/assets/item/" + item + ".png"}
+                  data-tooltip-id="item-detail-tooltip"
+                  data-tooltip-content={item}
                 />
               ))}
             </div>

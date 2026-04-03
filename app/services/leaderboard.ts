@@ -1,22 +1,23 @@
+import UserMetadata from "../models/mongo-models/user-metadata"
 import {
   ILeaderboardBotInfo,
   ILeaderboardInfo
 } from "../types/interfaces/LeaderboardInfo"
-import UserMetadata from "../models/mongo-models/user-metadata"
 import { logger } from "../utils/logger"
-import { matchMaker } from "colyseus"
-import { IBot } from "../models/mongo-models/bot-v2"
+import { fetchBotsList } from "./bots"
 
 let leaderboard = new Array<ILeaderboardInfo>()
 let levelLeaderboard = new Array<ILeaderboardInfo>()
 let botLeaderboard = new Array<ILeaderboardBotInfo>()
+let eventLeaderboard = new Array<ILeaderboardInfo>()
 
 export function fetchLeaderboards() {
   logger.info("Refreshing leaderboards...")
   return Promise.all([
     fetchUserLeaderboard(),
     fetchBotsLeaderboard(),
-    fetchLevelLeaderboard()
+    fetchLevelLeaderboard(),
+    fetchEventLeaderboard()
   ])
 }
 
@@ -25,7 +26,7 @@ export async function fetchUserLeaderboard() {
     {},
     ["displayName", "avatar", "elo", "uid"],
     { limit: 100, sort: { elo: -1 } }
-  )
+  ).lean()
 
   if (users) {
     leaderboard = users.map((user, i) => ({
@@ -44,7 +45,7 @@ export async function fetchLevelLeaderboard() {
     {},
     ["displayName", "avatar", "level", "uid"],
     { limit: 100, sort: { level: -1 } }
-  )
+  ).lean()
 
   if (levelUsers) {
     levelLeaderboard = levelUsers.map((user, i) => ({
@@ -61,25 +62,46 @@ export async function fetchLevelLeaderboard() {
 
 export async function fetchBotsLeaderboard() {
   botLeaderboard = []
-  const bots = Object.values(await matchMaker.presence.hgetall("bots")).map(
-    (bot) => JSON.parse(bot) as IBot
-  )
-  bots.forEach((bot, i) => {
-    botLeaderboard.push({
-      name: bot.name,
-      avatar: bot.avatar,
-      rank: i + 1,
-      value: bot.elo,
-      author: bot.author
+  const bots = await fetchBotsList(true)
+  bots
+    .sort((a, b) => b.elo - a.elo)
+    .forEach((bot, i) => {
+      botLeaderboard.push({
+        name: bot.name,
+        avatar: bot.avatar,
+        rank: i + 1,
+        value: bot.elo,
+        author: bot.author
+      })
     })
-  })
   return botLeaderboard
+}
+
+export async function fetchEventLeaderboard() {
+  const users = await UserMetadata.find(
+    { eventPoints: { $gt: 0 } },
+    ["displayName", "avatar", "eventPoints", "eventFinishTime", "uid"],
+    { limit: 100, sort: { eventPoints: -1, eventFinishTime: 1 } }
+  ).lean()
+
+  if (users) {
+    eventLeaderboard = users.map((user, i) => ({
+      name: user.displayName,
+      rank: i + 1,
+      avatar: user.avatar,
+      value: user.eventPoints,
+      eventFinishTime: user.eventFinishTime,
+      id: user.uid
+    }))
+  }
+  return eventLeaderboard
 }
 
 export function getLeaderboard() {
   return {
     leaderboard,
     botLeaderboard,
-    levelLeaderboard
+    levelLeaderboard,
+    eventLeaderboard
   }
 }

@@ -1,39 +1,66 @@
 import { t } from "i18next"
-import React, { useState } from "react"
+import React from "react"
 import { Tab, TabList, TabPanel, Tabs } from "react-tabs"
-import { Tooltip } from "react-tooltip"
 import { PkmWithCustom } from "../../../../../types"
 import {
-  ArtificialItems,
-  ItemComponents,
   Berries,
   CraftableItems,
   Item,
-  ShinyItems
+  ItemComponents,
+  MemoryDiscs,
+  ShinyItems,
+  TMs,
+  Tools
 } from "../../../../../types/enum/Item"
 import { ItemDetailTooltip } from "../../../game/components/item-detail"
 import { cc } from "../../utils/jsx"
 
 export default function ItemPicker(props: {
-  selected: PkmWithCustom | Item
-  selectEntity: React.Dispatch<React.SetStateAction<PkmWithCustom | Item>>
+  selected?: PkmWithCustom | Item
+  selectEntity?: React.Dispatch<React.SetStateAction<PkmWithCustom | Item>>
 }) {
-  const [itemHovered, setItemHovered] = useState<Item>()
-
   function handleOnDragStart(e: React.DragEvent, item: Item) {
-    e.dataTransfer.setData("item", item)
+    e.stopPropagation()
+    e.dataTransfer.setData("text/plain", `item,${item}`)
   }
 
   const tabs = [
     { label: t("components"), key: "components", items: ItemComponents },
     { label: t("craftable_items"), key: "craftable", items: CraftableItems },
-    { label: t("food"), key: "food", items: [...Berries, Item.TART_APPLE, Item.SWEET_APPLE, Item.SIRUPY_APPLE, Item.CHEF_HAT] },
+    {
+      label: t("food"),
+      key: "food",
+      items: [
+        ...Berries,
+        Item.TART_APPLE,
+        Item.SWEET_APPLE,
+        Item.SIRUPY_APPLE,
+        Item.CHEF_HAT
+      ]
+    },
 
-    { label: t("artificial_items"), key: "artificial", items: ArtificialItems },
+    { label: t("tools"), key: "tools", items: Tools },
+    {
+      label: t("tm_short"),
+      key: "tm",
+      items: TMs
+    },
     {
       label: t("shiny_items"),
       key: "shiny_items",
       items: ShinyItems
+    },
+    {
+      label: t("special_items"),
+      key: "special_items",
+      items: [
+        Item.RUSTED_SWORD,
+        Item.TEAL_MASK,
+        Item.WELLSPRING_MASK,
+        Item.CORNERSTONE_MASK,
+        Item.HEARTHFLAME_MASK,
+        ...MemoryDiscs
+      ]
     }
   ]
 
@@ -53,21 +80,16 @@ export default function ItemPicker(props: {
               className={cc("item", {
                 selected: item === props.selected
               })}
-              data-tooltip-id="item-detail"
-              onMouseOver={() => setItemHovered(item)}
-              onClick={() => props.selectEntity(item)}
+              data-tooltip-id="item-detail-tooltip"
+              data-tooltip-content={item}
+              onClick={() => props.selectEntity?.(item)}
               draggable
               onDragStart={(e) => handleOnDragStart(e, item)}
             />
           ))}
         </TabPanel>
       ))}
-      {itemHovered && <Tooltip
-        id="item-detail"
-        className="custom-theme-tooltip item-detail-tooltip"
-      >
-        <ItemDetailTooltip item={itemHovered} />
-      </Tooltip>}
+      <ItemDetailTooltip />
     </Tabs>
   )
 }

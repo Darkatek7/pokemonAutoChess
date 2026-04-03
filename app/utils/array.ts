@@ -1,5 +1,10 @@
 import { ArraySchema } from "@colyseus/schema"
 
+// see https://stackoverflow.com/questions/56565528/typescript-const-assertions-how-to-use-array-prototype-includes
+export function isIn<T>(values: readonly T[], x: any): x is T {
+  return values.includes(x)
+}
+
 export const groupBy = <T, K extends keyof any>(arr: T[], key: (i: T) => K) =>
   arr.reduce(
     (groups, item) => {
@@ -38,4 +43,8 @@ export function count<T>(arr: T[] | ArraySchema<T>, el: T): number {
 
 export function wrapInArray<T>(value: T | T[]): T[] {
   return Array.isArray(value) ? value : [value]
+}
+
+export function range(start: number, end: number): number[] {
+  return Array.from({ length: end - start + 1 }, (_, i) => i + start)
 }

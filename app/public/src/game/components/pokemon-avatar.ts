@@ -2,17 +2,17 @@ import { GameObjects } from "phaser"
 import PokemonFactory from "../../../../models/pokemon-factory"
 import { AvatarEmotions, Emotion, IPokemonAvatar } from "../../../../types"
 import { GamePhaseState } from "../../../../types/enum/Game"
-import { throttle } from "../../../../utils/function"
-import { SOUNDS, playSound } from "../../pages/utils/audio"
-import store from "../../stores"
-import { showEmote } from "../../stores/NetworkStore"
 import { getAvatarSrc, getAvatarString } from "../../../../utils/avatar"
+import { throttle } from "../../../../utils/function"
+import { showEmote } from "../../network"
+import { playSound, SOUNDS } from "../../pages/utils/audio"
+import { preference } from "../../preferences"
+import store from "../../stores"
+import { DEPTH } from "../depths"
 import GameScene from "../scenes/game-scene"
 import EmoteMenu from "./emote-menu"
 import LifeBar from "./life-bar"
 import PokemonSprite from "./pokemon"
-import { preference } from "../../preferences"
-import { DEPTH } from "../depths"
 
 export default class PokemonAvatar extends PokemonSprite {
   scene: GameScene
@@ -165,7 +165,7 @@ export default class PokemonAvatar extends PokemonSprite {
   }
 
   updateLife(life: number) {
-    this.lifebar?.setLife(life)
+    this.lifebar?.setHp(life)
   }
 
   drawSpeechBubble(emoteAvatar: string, isOpponent: boolean) {
@@ -207,8 +207,8 @@ export default class PokemonAvatar extends PokemonSprite {
     if (this.isCurrentPlayerAvatar && !this.emoteMenu) {
       this.emoteMenu = new EmoteMenu(
         this.scene as GameScene,
-        this.index,
-        this.shiny,
+        this.pokemon.index,
+        this.pokemon.shiny,
         this.sendEmote
       )
       this.add(this.emoteMenu)
@@ -230,8 +230,8 @@ export default class PokemonAvatar extends PokemonSprite {
   sendEmote(emotion: Emotion) {
     const state = store.getState()
     if (state.game.emotesUnlocked.includes(emotion)) {
-      store.dispatch(
-        showEmote(getAvatarString(this.index, this.shiny, emotion))
+      showEmote(
+        getAvatarString(this.pokemon.index, this.pokemon.shiny, emotion)
       )
       this.hideEmoteMenu()
     }
@@ -239,7 +239,7 @@ export default class PokemonAvatar extends PokemonSprite {
 
   playAnimation() {
     try {
-      store.dispatch(showEmote())
+      showEmote()
     } catch (err) {
       console.error("could not play animation", err)
     }

@@ -1,7 +1,9 @@
 import Player from "../models/colyseus-models/player"
 import { BotV2, IBot } from "../models/mongo-models/bot-v2"
 import PokemonFactory from "../models/pokemon-factory"
-import { Emotion } from "../types"
+import { AbilityPerTM, Emotion, TMs } from "../types"
+import { PokemonActionState } from "../types/enum/Game"
+import { Synergy } from "../types/enum/Synergy"
 import { logger } from "../utils/logger"
 
 export default class Bot {
@@ -40,6 +42,7 @@ export default class Bot {
       this.step += 1
       this.progress -= this.scenario.steps[this.step].roundsRequired
       this.updatePlayerTeam()
+      this.updateFlowerPots()
     }
   }
 
@@ -64,7 +67,14 @@ export default class Bot {
         pkm.positionY = stepTeam.board[i].y
         if (stepTeam.board[i].items) {
           stepTeam.board[i].items.forEach((item) => {
-            if (!pkm.items.has(item)) {
+            if (TMs.includes(item)) {
+              const ability = AbilityPerTM[item]
+              if (!ability || pkm.types.has(Synergy.HUMAN) === false)
+                return false // prevent equipping TMs on non-human pokemon
+              pkm.tm = ability
+              pkm.skill = ability
+              pkm.maxPP = 100
+            } else if (!pkm.items.has(item)) {
               pkm.items.add(item)
             }
           })
@@ -73,6 +83,22 @@ export default class Bot {
       }
 
       this.player.updateSynergies()
+    }
+  }
+
+  updateFlowerPots() {
+    if (this.step % 3 === 0 && this.step >= 6 && this.step < 30) {
+      const mulchIndex = Math.floor(this.step / 3) - 2
+      const potIndex = mulchIndex % 4
+      const flowerPot = this.player.flowerPots[potIndex]
+      if (flowerPot && flowerPot.evolution) {
+        const potEvolution = PokemonFactory.createPokemonFromName(
+          flowerPot.evolution,
+          this.player
+        )
+        potEvolution.action = PokemonActionState.SLEEP
+        this.player.flowerPots[potIndex] = potEvolution
+      }
     }
   }
 }

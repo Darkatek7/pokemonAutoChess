@@ -1,7 +1,9 @@
 import { ArraySchema, Schema, type } from "@colyseus/schema"
 import { IAfterGamePlayer, Role } from "../../types"
 import { Synergy } from "../../types/enum/Synergy"
+import { GameStats } from "../../types/interfaces/GameStats"
 import { IPokemonRecord, PokemonRecord } from "./game-record"
+import { GameStatsSchema } from "./game-stats"
 
 export class SampleSynergy extends Schema {
   @type("string") name: Synergy
@@ -24,15 +26,14 @@ export default class AfterGamePlayer
   @type("uint8") rank: number
   @type([PokemonRecord]) pokemons = new ArraySchema<IPokemonRecord>()
   @type("uint16") elo: number
+  @type("uint16") games: number
   @type("string") title: string
   @type("string") role: Role
   @type([SampleSynergy]) synergies = new ArraySchema<{
     name: Synergy
     value: number
   }>()
-  @type("uint16") moneyEarned: number
-  @type("uint16") playerDamageDealt: number
-  @type("uint16") rerollCount: number
+  @type(GameStatsSchema) gameStats = new GameStatsSchema()
 
   constructor(
     id: string,
@@ -46,9 +47,8 @@ export default class AfterGamePlayer
       | Array<{ name: Synergy; value: number }>
       | ArraySchema<{ name: Synergy; value: number }>,
     elo: number,
-    moneyEarned: number,
-    playerDamageDealt: number,
-    rerollCount: number
+    games: number,
+    gameStats: GameStats
   ) {
     super()
     this.id = id
@@ -58,9 +58,8 @@ export default class AfterGamePlayer
     this.title = title
     this.role = role
     this.elo = elo
-    this.moneyEarned = moneyEarned
-    this.playerDamageDealt = playerDamageDealt
-    this.rerollCount = rerollCount
+    this.games = games
+    this.gameStats = new GameStatsSchema(gameStats)
     pokemons.forEach((pkm) => {
       this.pokemons.push(new PokemonRecord(pkm))
     })

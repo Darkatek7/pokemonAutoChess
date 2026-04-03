@@ -4,9 +4,13 @@ import {
   clearTitleNotificationIcon,
   setTitleNotificationIcon
 } from "../../../../../utils/window"
+import { ChatRoom } from "../../../network"
 import ChatMessage from "./chat-message"
 
-export default function ChatHistory(props: { messages: IChatV2[] }) {
+export default function ChatHistory(props: {
+  messages: IChatV2[]
+  source: ChatRoom
+}) {
   const [readMessages, setReadMessages] = useState<IChatV2[]>([])
   const domRef = useRef<HTMLDivElement>(null)
 
@@ -17,7 +21,7 @@ export default function ChatHistory(props: { messages: IChatV2[] }) {
       domRef.current &&
       (domRef.current.scrollTop === 0 ||
         domRef.current.scrollTop + domRef.current.clientHeight >=
-        domRef.current.scrollHeight - 200) // autoscroll only if not already scrolled up by a 200px margin
+          domRef.current.scrollHeight - 200) // autoscroll only if not already scrolled up by a 200px margin
     ) {
       domRef.current.scrollTop = domRef.current.scrollHeight
     }
@@ -66,7 +70,13 @@ export default function ChatHistory(props: { messages: IChatV2[] }) {
           <React.Fragment key={date}>
             <div className="date">{date}</div>
             {chatMessages.map((message, index) => {
-              return <ChatMessage key={index} message={message} />
+              return (
+                <ChatMessage
+                  key={index}
+                  message={message}
+                  source={props.source}
+                />
+              )
             })}
           </React.Fragment>
         )

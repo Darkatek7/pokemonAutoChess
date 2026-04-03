@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { DUST_PER_BOOSTER, DUST_PER_SHINY } from "../../../../../types/Config"
+import { throttle } from "../../../../../utils/function"
 import { useAppDispatch, useAppSelector } from "../../../hooks"
+import { openBooster } from "../../../network"
 import { setBoosterContent } from "../../../stores/LobbyStore"
-import { openBooster } from "../../../stores/NetworkStore"
 import { cc } from "../../utils/jsx"
 import { BoosterCard } from "./booster-card"
 import "./booster.css"
@@ -16,6 +16,9 @@ export default function Booster() {
   const numberOfBooster = user ? user.booster : 0
 
   const [flippedStates, setFlippedStates] = useState<boolean[]>([])
+  const [loading, setLoading] = useState(false)
+  const [isThrottled, setIsThrottled] = useState(false)
+  const THROTTLE_DURATION = 2000
 
   useEffect(() => {
     setFlippedStates(new Array(boosterContent.length).fill(false))
@@ -25,17 +28,34 @@ export default function Booster() {
   useEffect(
     () => () => {
       dispatch(setBoosterContent([]))
+      setLoading(false)
     },
     [dispatch]
   )
 
-  function onClickOpenBooster() {
-    if (flippedStates.some((flipped) => !flipped)) {
-      setFlippedStates(new Array(boosterContent.length).fill(true))
+  useEffect(() => {
+    if (boosterContent.length > 0) {
+      setLoading(false)
     }
-    else if (numberOfBooster > 0) {
+  }, [boosterContent])
+
+  const throttledBoosterOpen = useRef(
+    throttle(() => {
       dispatch(setBoosterContent([]))
-      dispatch(openBooster())
+      openBooster()
+      setLoading(true)
+    }, THROTTLE_DURATION)
+  ).current
+
+  const allCardsFlipped = flippedStates.every((flipped) => flipped)
+
+  function onClickOpenBooster() {
+    if (!allCardsFlipped) {
+      setFlippedStates(new Array(boosterContent.length).fill(true))
+    } else if (numberOfBooster > 0 && !isThrottled) {
+      throttledBoosterOpen()
+      setIsThrottled(true)
+      setTimeout(() => setIsThrottled(false), THROTTLE_DURATION)
     }
   }
 
@@ -50,11 +70,10 @@ export default function Booster() {
       </p>
 
       <div className="boosters-content">
-        {boosterContent.map((pkm, i) => (
+        {boosterContent.map((card, i) => (
           <BoosterCard
             key={"booster" + i}
-            pkm={pkm}
-            shards={pkm.shiny ? DUST_PER_SHINY : DUST_PER_BOOSTER}
+            card={card}
             flipped={flippedStates[i]}
             onFlip={() => handleFlip(i)}
           />
@@ -65,7 +84,9 @@ export default function Booster() {
         <button
           onClick={onClickOpenBooster}
           className={cc("bubbly", { blue: numberOfBooster > 0 })}
-          disabled={numberOfBooster <= 0}
+          disabled={
+            numberOfBooster <= 0 || loading || (allCardsFlipped && isThrottled)
+          }
         >
           {t("open_booster")}
         </button>

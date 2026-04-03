@@ -12,7 +12,7 @@ export enum Rarity {
 
 export enum GameMode {
   CUSTOM_LOBBY = "CUSTOM_LOBBY",
-  QUICKPLAY = "QUICKPLAY",
+  CLASSIC = "CLASSIC",
   RANKED = "RANKED",
   SCRIBBLE = "SCRIBBLE",
   TOURNAMENT = "TOURNAMENT"
@@ -31,20 +31,21 @@ export enum PokemonActionState {
   SLEEP = "Sleep",
   HOP = "Hop",
   HURT = "Hurt",
-  FISH = "Fish",
   EMOTE = "Emote",
-  EAT = "Eat"
+  EAT = "Eat",
+  FISH = "Fish",
+  BLOSSOM = "Blossom"
 }
 
 export enum Orientation {
   DOWN = "0",
-  DOWNLEFT = "7",
-  LEFT = "6",
-  UPLEFT = "5",
-  UP = "4",
-  UPRIGHT = "3",
+  DOWNRIGHT = "1",
   RIGHT = "2",
-  DOWNRIGHT = "1"
+  UPRIGHT = "3",
+  UP = "4",
+  UPLEFT = "5",
+  LEFT = "6",
+  DOWNLEFT = "7"
 }
 
 export const OrientationFlip: { [key in Orientation]: Orientation } = {

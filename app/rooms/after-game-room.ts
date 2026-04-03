@@ -3,12 +3,12 @@ import { Client, Room } from "colyseus"
 import admin from "firebase-admin"
 import AfterGamePlayer from "../models/colyseus-models/after-game-player"
 import UserMetadata from "../models/mongo-models/user-metadata"
-import { IAfterGamePlayer, Transfer } from "../types"
+import { IAfterGamePlayer } from "../types"
 import { GameMode } from "../types/enum/Game"
 import { logger } from "../utils/logger"
 import AfterGameState from "./states/after-game-state"
 
-export default class AfterGameRoom extends Room<AfterGameState> {
+export default class AfterGameRoom extends Room<{ state: AfterGameState }> {
   dispatcher: Dispatcher<this>
   constructor() {
     super()
@@ -18,8 +18,8 @@ export default class AfterGameRoom extends Room<AfterGameState> {
   onCreate(options: {
     players: IAfterGamePlayer[]
     idToken: string
-    elligibleToXP: boolean
-    elligibleToELO: boolean
+    eligibleToXP: boolean
+    eligibleToELO: boolean
     gameMode: GameMode
   }) {
     logger.info("Create AfterGame ", this.roomId)
@@ -38,9 +38,8 @@ export default class AfterGameRoom extends Room<AfterGameState> {
           plyr.role,
           plyr.synergies,
           plyr.elo,
-          plyr.moneyEarned,
-          plyr.playerDamageDealt,
-          plyr.rerollCount
+          plyr.games,
+          plyr.gameStats
         )
         this.state.players.set(player.id, player)
       })
@@ -57,7 +56,6 @@ export default class AfterGameRoom extends Room<AfterGameState> {
       const token = await admin.auth().verifyIdToken(options.idToken)
       const user = await admin.auth().getUser(token.uid)
       const userProfile = await UserMetadata.findOne({ uid: user.uid })
-      client.send(Transfer.USER_PROFILE, userProfile)
 
       if (!user.displayName) {
         throw "No display name"
@@ -75,19 +73,22 @@ export default class AfterGameRoom extends Room<AfterGameState> {
     //logger.info(`${client.auth.email} join after game`)
   }
 
-  async onLeave(client: Client, consented: boolean) {
+  async onDrop(client: Client, code: number) {
     try {
-      if (consented) {
-        throw new Error("consented leave")
-      }
-
       // allow disconnected client to reconnect into this room until 20 seconds
       await this.allowReconnection(client, 20)
     } catch (e) {
       /*if (client && client.auth && client.auth.displayName) {
-        logger.info(`${client.auth.displayName} leave after game room`)
+        logger.info(`${client.auth.displayName} left after game room`)
       }*/
     }
+  }
+
+  async onLeave(client: Client, code: number) {
+    // player not coming back
+    /*if (client && client.auth && client.auth.displayName) {
+        logger.info(`${client.auth.displayName} leave after game room`)
+    }*/
   }
 
   onDispose() {

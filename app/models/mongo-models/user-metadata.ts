@@ -1,33 +1,14 @@
-import { Schema, model } from "mongoose"
-import { ArraySchema } from "@colyseus/schema"
+import { model, Schema } from "mongoose"
+import { ExpThreshold } from "../../config"
+import { CollectionUtils } from "../../core/collection"
+import { notificationsService } from "../../services/notifications"
 import { Emotion, Role, Title } from "../../types"
-import { Language } from "../../types/enum/Language"
-
-export interface IUserMetadata {
-  uid: string
-  displayName: string
-  language: Language | ""
-  avatar: string
-  wins: number
-  exp: number
-  level: number
-  elo: number
-  pokemonCollection: Map<string, IPokemonCollectionItem>
-  booster: number
-  titles: Title[]
-  title: "" | Title
-  role: Role
-  banned?: boolean
-}
-
-export interface IPokemonCollectionItem {
-  dust: number
-  emotions: Emotion[] | ArraySchema<Emotion>
-  shinyEmotions: Emotion[] | ArraySchema<Emotion>
-  selectedEmotion: Emotion
-  selectedShiny: boolean
-  id: string
-}
+import {
+  IPokemonCollectionItemMongo,
+  IUserMetadataJSON,
+  IUserMetadataLean,
+  IUserMetadataMongo
+} from "../../types/interfaces/UserMetadata"
 
 const userMetadataSchema = new Schema({
   uid: {
@@ -48,6 +29,10 @@ const userMetadataSchema = new Schema({
     type: Number,
     default: 0
   },
+  games: {
+    type: Number,
+    default: 0
+  },
   exp: {
     type: Number,
     default: 0
@@ -59,6 +44,22 @@ const userMetadataSchema = new Schema({
   elo: {
     type: Number,
     default: 1000
+  },
+  maxElo: {
+    type: Number,
+    default: 1000
+  },
+  eventPoints: {
+    type: Number,
+    default: 0
+  },
+  maxEventPoints: {
+    type: Number,
+    default: 0
+  },
+  eventFinishTime: {
+    type: Date,
+    sparse: true
   },
   booster: {
     type: Number,
@@ -88,30 +89,85 @@ const userMetadataSchema = new Schema({
       dust: {
         type: Number
       },
+      // OPTIMIZED: Single 5-byte field instead of multiple arrays for emotions and shiny emotions unlocked
+      unlocked: {
+        type: Buffer,
+        default: () => Buffer.alloc(5, 0)
+      },
       selectedEmotion: {
         type: String,
         enum: Emotion
       },
-      emotions: [
-        {
-          type: String,
-          enum: Emotion
-        }
-      ],
-      shinyEmotions: [
-        {
-          type: String,
-          enum: Emotion
-        }
-      ],
       selectedShiny: {
         type: Boolean
       },
       id: {
         type: String
+      },
+      played: {
+        type: Number,
+        default: 0
       }
     }
   }
 })
 
-export default model<IUserMetadata>("UserMetadata", userMetadataSchema)
+userMetadataSchema.index(
+  { displayName: 1 },
+  { collation: { locale: "en", strength: 2 } }
+)
+
+export default model<IUserMetadataMongo>("UserMetadata", userMetadataSchema)
+
+export function toLeanUserMetadata(
+  user: IUserMetadataLean
+): IUserMetadataMongo {
+  const pokemonCollection = new Map<string, IPokemonCollectionItemMongo>()
+  for (const [key, item] of Object.entries(user.pokemonCollection ?? {})) {
+    pokemonCollection.set(key, {
+      ...item,
+      unlocked: Buffer.isBuffer(item.unlocked)
+        ? item.unlocked
+        : item.unlocked?.buffer
+          ? Buffer.from(item.unlocked.buffer)
+          : Buffer.alloc(5, 0)
+    })
+  }
+  return {
+    ...user,
+    pokemonCollection
+  } as IUserMetadataMongo
+}
+
+export function toUserMetadataJSON(user): IUserMetadataJSON {
+  const pokemonCollection: {
+    [index: string]: IUserMetadataJSON["pokemonCollection"][string]
+  } = {}
+  user.pokemonCollection.forEach((item, index) => {
+    pokemonCollection[index] = CollectionUtils.toCollectionItemClient(item)
+  })
+  return {
+    ...user.toObject(),
+    pokemonCollection
+  }
+}
+
+export function giveUserExp(user: IUserMetadataMongo, exp: number) {
+  if (user.exp + exp >= ExpThreshold) {
+    user.level += 1
+    user.booster += 1
+    user.exp = user.exp + exp - ExpThreshold
+
+    if (user.level <= 2) {
+      // Add level up notification
+      notificationsService.addNotification(
+        user.uid,
+        "level_up",
+        user.level.toString()
+      )
+    }
+  } else {
+    user.exp = user.exp + exp
+  }
+  user.exp = !isNaN(user.exp) ? user.exp : 0
+}

@@ -1,10 +1,10 @@
 import React from "react"
 import { useTranslation } from "react-i18next"
+import { validateBot } from "../../../../../core/bot-logic"
 import { IBot } from "../../../../../models/mongo-models/bot-v2"
 import { Emotion, PkmWithCustom } from "../../../../../types"
 import { Pkm } from "../../../../../types/enum/Pokemon"
 import { getAvatarSrc } from "../../../../../utils/avatar"
-import { validateBot } from "../../../../../core/bot-logic"
 
 export default function BotAvatar(props: {
   bot: IBot
@@ -14,13 +14,18 @@ export default function BotAvatar(props: {
   const { t } = useTranslation()
 
   function handleOnDragOver(e: React.DragEvent) {
+    e.stopPropagation()
     e.preventDefault()
   }
 
   function handleDrop(e: React.DragEvent) {
-    if (e.dataTransfer.getData("pokemon") != "") {
+    e.stopPropagation()
+    e.preventDefault()
+    const data = e.dataTransfer.getData("text/plain")
+    if (data.startsWith("pokemon")) {
+      const [type, name] = data.split(",") as [string, Pkm]
       props.onChangeAvatar({
-        name: e.dataTransfer.getData("pokemon") as Pkm,
+        name,
         emotion: Emotion.NORMAL,
         shiny: false
       })

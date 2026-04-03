@@ -123,16 +123,16 @@
 - Fixed no music when spectating game
 - Comfey can no longer be hold by pokemons that cannot hold items like Unowns
 - Fixed Comfey being duplicated when given to flora spawn
-- Flying protections no longer are reset after resurection
+- Flying protections no longer are reset after resurrection
 - Pokedoll no longer reduce true damage
-- Roar of time now cannot target units that already have resurection status
+- Roar of time now cannot target units that already have resurrection status
 - Fixed Technologic Scribble giving you twice the same artificial item
 
 # Misc
 
 - New title: Bloody
 - New title: Eternal
-- The minimum amount of players to make a room elligible for Elo is 4 human players instead of 2.
+- The minimum amount of players to make a room eligible for Elo is 4 human players instead of 2.
 - Finishing 8th now gives 50 xp instead of zero
 - The spanish translation has been improved and completed thanks to the efforts of ryuknn and ImLowTier. Muchas gracias!
 - You can now filter pokemon meta report section by elo

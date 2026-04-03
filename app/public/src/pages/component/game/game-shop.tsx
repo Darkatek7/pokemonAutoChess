@@ -7,9 +7,9 @@ import GameLock from "./game-lock"
 import { GameMoneyInfo } from "./game-money-info"
 import GameRarityPercentage from "./game-rarity-percentage"
 import GameRefresh from "./game-refresh"
+import { GameRegionalPokemonsIcon } from "./game-regional-pokemons"
 import GameStore from "./game-store"
 import { GameTeamInfo } from "./game-team-info"
-import { GameRegionalPokemonsIcon } from "./game-regional-pokemons"
 import "./game-shop.css"
 
 export default function GameShop() {
@@ -36,6 +36,7 @@ export default function GameShop() {
       </div>
       <ToastContainer
         className="toast"
+        toastClassName="toast-shop"
         containerId="toast-money"
         position="bottom-center"
         autoClose={2000}
@@ -48,6 +49,7 @@ export default function GameShop() {
       />
       <ToastContainer
         className="toast"
+        toastClassName="toast-shop"
         containerId="toast-life"
         position="bottom-center"
         autoClose={2000}

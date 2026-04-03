@@ -1,12 +1,12 @@
-import { IPokemonData } from "../../types/interfaces/PokemonData"
-import { Pkm, PkmFamily, PkmIndex } from "../../types/enum/Pokemon"
-import { Synergy } from "../../types/enum/Synergy"
-import { mapToObj } from "../../utils/map"
-import { values } from "../../utils/schemas"
 import { precomputedPokemons } from "../../../gen/precomputed-pokemons"
 import { Ability } from "../../types/enum/Ability"
 import { Rarity } from "../../types/enum/Game"
 import { Passive } from "../../types/enum/Passive"
+import { Pkm, PkmFamily, PkmIndex } from "../../types/enum/Pokemon"
+import { Synergy } from "../../types/enum/Synergy"
+import { IPokemonData } from "../../types/interfaces/PokemonData"
+import { mapToObj } from "../../utils/map"
+import { values } from "../../utils/schemas"
 
 console.time("precompute-pokemon-data")
 
@@ -21,18 +21,20 @@ precomputedPokemons.forEach((pokemon) => {
     additional: pokemon.additional,
     regional: pokemon.regional,
     hp: pokemon.hp,
+    pp: pokemon.maxPP,
     range: pokemon.range,
     types: values(pokemon.types) as Synergy[],
     evolution: pokemon.evolution === Pkm.DEFAULT ? null : pokemon.evolution,
     evolutions: pokemon.evolutions,
-    stages:
-      pokemon.stages ??
-      Math.max(
-        ...precomputedPokemons
-          .filter((p) => PkmFamily[p.name] === PkmFamily[pokemon.name])
-          .filter((p) => p.skill !== Ability.DEFAULT)
-          .map((p) => p.stars)
-      )
+    stages: Math.max(
+      ...precomputedPokemons
+        .filter(
+          (p) =>
+            PkmFamily[p.name] === PkmFamily[pokemon.name] &&
+            p.skill !== Ability.DEFAULT
+        )
+        .map((p) => p.stars)
+    )
   })
 })
 
@@ -59,6 +61,7 @@ export function getPokemonData(name: Pkm): IPokemonData {
     additional: false,
     regional: false,
     hp: 10,
+    pp: 100,
     range: 1,
     rarity: Rarity.SPECIAL,
     stars: 1,

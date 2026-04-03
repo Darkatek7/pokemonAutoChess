@@ -1,13 +1,13 @@
-import React from "react"
-import { useTranslation } from "react-i18next"
-import { SynergyTriggers } from "../../../../../types/Config"
+import { SynergyTriggers } from "../../../../../config"
 import { Synergy } from "../../../../../types/enum/Synergy"
 import SynergyComponent from "./synergy-component"
 
 import "./synergies.css"
 
-export default function Synergies(props: { synergies: [string, number][], tooltipPortal: boolean }) {
-  const { t } = useTranslation()
+export default function Synergies(props: {
+  synergies: [string, number][]
+  tooltipPortal: boolean
+}) {
   const synergies = Object.keys(Synergy)
     .sort((a, b) => {
       const fa = props.synergies.find((e) => e[0] == a)
@@ -30,8 +30,7 @@ export default function Synergies(props: { synergies: [string, number][], toolti
     })
 
   return (
-    <div className="synergies-container my-container">
-      <h2 className="synergies-header">{t("synergies")}</h2>
+    <div className="synergies-list">
       {synergies.map((type, index) => {
         const s = props.synergies.find((e) => e[0] == type)!
         return (

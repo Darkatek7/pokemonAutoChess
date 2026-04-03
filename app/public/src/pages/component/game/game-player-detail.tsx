@@ -1,9 +1,11 @@
 import React, { useMemo } from "react"
 import { useTranslation } from "react-i18next"
+import { SynergyTriggers } from "../../../../../config"
+import { getDistance } from "../../../../../core/matchmaking"
 import { IPlayer } from "../../../../../types"
-import { SynergyTriggers } from "../../../../../types/Config"
 import { BattleResult } from "../../../../../types/enum/Game"
 import { getAvatarSrc } from "../../../../../utils/avatar"
+import { selectConnectedPlayer, useAppSelector } from "../../../hooks"
 import { Life } from "../icons/life"
 import { Money } from "../icons/money"
 
@@ -13,9 +15,16 @@ export default function GamePlayerDetail(props: { player: IPlayer }) {
     () =>
       [...props.player.synergies.entries()]
         .filter(([syn, val]) => val >= SynergyTriggers[syn]?.[0])
+        .sort((a, b) => b[1] - a[1])
         .map(([syn]) => syn),
     [props.player.synergies]
   )
+
+  const connectedPlayer = useAppSelector(selectConnectedPlayer)
+  const distance =
+    connectedPlayer && props.player.id !== connectedPlayer.id
+      ? getDistance(props.player, connectedPlayer, false)
+      : null
 
   return (
     <div>
@@ -71,6 +80,17 @@ export default function GamePlayerDetail(props: { player: IPlayer }) {
             </div>
           )
         })}
+        <div className="spacer"></div>
+        {distance != null && (
+          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <img
+              src="/assets/ui/time.svg"
+              style={{ width: "16px", height: "16px" }}
+              title={t("rounds_since_last_fight", { count: distance })}
+            />
+            {distance}
+          </div>
+        )}
       </div>
       <div style={{ display: "flex", justifyContent: "start" }}>
         {synergyList.map((synergy, i) => {
@@ -96,9 +116,30 @@ export default function GamePlayerDetail(props: { player: IPlayer }) {
       </div>
       <div style={{ display: "flex", justifyContent: "space-evenly" }}>
         <span>{t("total")}</span>
-        <span title={t("total_money_earned")}><img src="assets/icons/money_total.svg" alt="$" style={{ width: "24px", height: "24px" }} /> {props.player.totalMoneyEarned}</span>
-        <span title={t("total_player_damage_dealt")}><img src="assets/icons/ATK.png" alt="✊" style={{ width: "24px", height: "24px" }} />{props.player.totalPlayerDamageDealt}</span>
-        <span title={t("total_reroll_count")}><img src="assets/ui/refresh.svg" alt="↻" style={{ width: "24px", height: "24px" }} /> {props.player.rerollCount}</span>
+        <span title={t("total_money_earned")}>
+          <img
+            src="assets/icons/money_total.svg"
+            alt="$"
+            style={{ width: "24px", height: "24px" }}
+          />{" "}
+          {props.player.gameStats.totalMoneyEarned}
+        </span>
+        <span title={t("total_player_damage_dealt")}>
+          <img
+            src="assets/icons/ATK.png"
+            alt="✊"
+            style={{ width: "24px", height: "24px" }}
+          />
+          {props.player.gameStats.totalPlayerDamageDealt}
+        </span>
+        <span title={t("total_reroll_count")}>
+          <img
+            src="assets/ui/refresh.svg"
+            alt="↻"
+            style={{ width: "24px", height: "24px" }}
+          />{" "}
+          {props.player.gameStats.rerollCount}
+        </span>
       </div>
     </div>
   )

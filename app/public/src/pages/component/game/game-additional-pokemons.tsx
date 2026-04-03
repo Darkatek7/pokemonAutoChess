@@ -1,13 +1,16 @@
 import React from "react"
 import { useTranslation } from "react-i18next"
 import { Tooltip } from "react-tooltip"
+import { RarityColor } from "../../../../../config"
 import { getPokemonData } from "../../../../../models/precomputed/precomputed-pokemon-data"
-import { RarityColor } from "../../../../../types/Config"
 import { SpecialGameRule } from "../../../../../types/enum/SpecialGameRule"
-import { selectCurrentPlayer, useAppSelector } from "../../../hooks"
-import { getPortraitSrc } from "../../../../../utils/avatar"
+import {
+  selectConnectedPlayer,
+  selectSpectatedPlayer,
+  useAppSelector
+} from "../../../hooks"
 import SynergyIcon from "../icons/synergy-icon"
-import { getPkmWithCustom } from "../../../../../models/colyseus-models/pokemon-customs"
+import { getCachedPortrait } from "./game-pokemon-portrait"
 
 export function GameAdditionalPokemonsIcon() {
   return (
@@ -36,7 +39,7 @@ export function GameAdditionalPokemons() {
   const additionalPokemons = useAppSelector(
     (state) => state.game.additionalPokemons
   )
-  const currentPlayer = useAppSelector(selectCurrentPlayer)
+  const currentPlayer = useAppSelector(selectConnectedPlayer)
 
   if (specialGameRule === SpecialGameRule.EVERYONE_IS_HERE) {
     return (
@@ -59,8 +62,6 @@ export function GameAdditionalPokemons() {
           {additionalPokemons.map((p, index) => {
             const pokemon = getPokemonData(p)
             const rarityColor = RarityColor[pokemon.rarity]
-            const custom = getPkmWithCustom(pokemon.index, currentPlayer?.pokemonCustoms)
-
             return (
               <div
                 className="my-box clickable game-pokemon-portrait"
@@ -68,7 +69,7 @@ export function GameAdditionalPokemons() {
                 style={{
                   backgroundColor: rarityColor,
                   borderColor: rarityColor,
-                  backgroundImage: `url("${getPortraitSrc(pokemon.index, custom.shiny, custom.emotion)}")`
+                  backgroundImage: `url("${getCachedPortrait(pokemon.index, currentPlayer?.pokemonCustoms)}")`
                 }}
               >
                 <ul className="game-pokemon-portrait-types">

@@ -6,19 +6,19 @@ import "./modal.css"
 
 interface ModalProps {
   show: boolean
-  onClose?: () => void
+  onClose?: () => boolean | void
   className?: string
-  header?: JSX.Element | string
-  body?: JSX.Element | string
-  footer?: JSX.Element
-  children?: JSX.Element | JSX.Element[]
+  header?: React.ReactElement | string
+  body?: React.ReactElement | string
+  footer?: React.ReactElement
+  children?: React.ReactElement | React.ReactElement[]
   confirmText?: string
 }
 
 export function Modal(props: ModalProps) {
   const {
     show,
-    onClose = () => { },
+    onClose = () => {},
     className = "",
     children,
     confirmText,
@@ -30,8 +30,9 @@ export function Modal(props: ModalProps) {
   const { t } = useTranslation()
 
   const close = () => {
-    ref.current?.close()
-    onClose()
+    if (ref.current?.open && onClose() !== false) {
+      ref.current?.close()
+    }
   }
 
   useEffect(() => {
@@ -52,8 +53,8 @@ export function Modal(props: ModalProps) {
             event.clientY <= rect.top + rect.height &&
             rect.left <= event.clientX &&
             event.clientX <= rect.left + rect.width) ||
-          ["OPTION", "SELECT"].includes((event.target as any).tagName)
-        if (!isInDialog) {
+          ["OPTION", "SELECT", "BUTTON"].includes((event.target as any).tagName)
+        if (show && !isInDialog) {
           close()
         }
       })
@@ -68,38 +69,38 @@ export function Modal(props: ModalProps) {
 
   return show
     ? ReactDOM.createPortal(
-      <dialog
-        ref={ref}
-        onCancel={close}
-        className={cc("modal", "my-container", className)}
-        onKeyDown={handleKeyDown}
-      >
-        {header && (
-          <header>
-            {header}
-            <button className="close-btn" onClick={close}>
-              🗙
-            </button>
-          </header>
-        )}
-        <div className="modal-body">{body || children}</div>
-        {(footer || confirmText) && (
-          <footer>
-            {footer}
-            {confirmText && (
-              <>
-                <button className="secondary" onClick={close}>
-                  {t("close")}
-                </button>
-                <button className="primary" onClick={close}>
-                  {confirmText}
-                </button>
-              </>
-            )}
-          </footer>
-        )}
-      </dialog>,
-      document.querySelector("#modal-root")!
-    )
+        <dialog
+          ref={ref}
+          onCancel={close}
+          className={cc("modal", "my-container", className)}
+          onKeyDown={handleKeyDown}
+        >
+          {header && (
+            <header>
+              {header}
+              <button className="close-btn" onClick={close}>
+                🗙
+              </button>
+            </header>
+          )}
+          <div className="modal-body">{body || children}</div>
+          {(footer || confirmText) && (
+            <footer>
+              {footer}
+              {confirmText && (
+                <>
+                  <button className="secondary" onClick={close}>
+                    {t("close")}
+                  </button>
+                  <button className="primary" onClick={close}>
+                    {confirmText}
+                  </button>
+                </>
+              )}
+            </footer>
+          )}
+        </dialog>,
+        document.querySelector("#modal-root")!
+      )
     : null
 }

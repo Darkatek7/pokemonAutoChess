@@ -1,27 +1,27 @@
-import React, { useCallback, useState } from "react"
+import firebase from "firebase/compat/app"
+import React, { useCallback, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Tab, TabList, TabPanel, Tabs } from "react-tabs"
 import { IGameRecord } from "../../../../../models/colyseus-models/game-record"
-import { Role, Title } from "../../../../../types"
+import { ISuggestionUser, Role, Title } from "../../../../../types"
+import { debounce } from "../../../../../utils/function"
 import { useAppDispatch, useAppSelector } from "../../../hooks"
-import { setSearchedUser, setSuggestions } from "../../../stores/LobbyStore"
 import {
   ban,
   giveBooster,
   giveRole,
   giveTitle,
-  heapSnapshot,
   searchById,
-  searchName,
   unban
-} from "../../../stores/NetworkStore"
+} from "../../../network"
+import { setSearchedUser } from "../../../stores/LobbyStore"
 import { AccountTab } from "./account-tab"
 import { AvatarTab } from "./avatar-tab"
 import { GadgetsTab } from "./gadgets-tab"
 import GameHistory from "./game-history"
-import { ProfileChatHistory } from "./profile-chat-history"
-import { NameTab } from "./name-tab"
 import PlayerBox from "./player-box"
+import { ProfileChatHistory } from "./profile-chat-history"
+import { ProgressTab } from "./progress-tab"
 import { SearchBar } from "./search-bar"
 import SearchResults from "./search-results"
 import { TitleTab } from "./title-tab"
@@ -31,25 +31,70 @@ export default function Profile() {
   const { t } = useTranslation()
   const dispatch = useAppDispatch()
   const user = useAppSelector((state) => state.network.profile)
-  const suggestions = useAppSelector((state) => state.lobby.suggestions)
+  const [suggestions, setSuggestions] = useState<ISuggestionUser[]>([])
   const searchedUser = useAppSelector((state) => state.lobby.searchedUser)
 
   const profile = searchedUser ?? user
   const [gameHistory, setGameHistory] = useState<IGameRecord[]>([])
   const [rightPanel, setRightPanel] = useState<"chat" | "game">("game")
 
+  const [loading, setLoading] = useState<boolean>(false)
+  const [error, setError] = useState<string>("")
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  async function searchName(query: string) {
+    abortControllerRef.current = new AbortController()
+    const { signal } = abortControllerRef.current
+    setLoading(true)
+    setError("")
+    try {
+      const token = await firebase.auth().currentUser?.getIdToken()
+      const res = await fetch(`/players?name=${encodeURIComponent(query)}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        signal
+      })
+      if (res.ok) {
+        const suggestions = await res.json()
+        if (suggestions.length === 0) {
+          setError(t("no_results_found"))
+        } else {
+          setSuggestions(suggestions)
+          setError("")
+        }
+      } else {
+        setError(res.statusText)
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        setError(err.message)
+      }
+    }
+    setLoading(false)
+  }
+
+  const debouncedSearchName = useRef(debounce(searchName, 500)).current
+
   function onSearchQueryChange(query: string) {
+    abortControllerRef.current?.abort()
     if (query) {
-      dispatch(searchName(query))
+      debouncedSearchName(query)
     } else {
       resetSearch()
     }
   }
 
-  const resetSearch = useCallback((user = searchedUser) => {
-    dispatch(setSearchedUser(user))
-    dispatch(setSuggestions([]))
-  }, [dispatch])
+  const resetSearch = useCallback(
+    (user = searchedUser) => {
+      dispatch(setSearchedUser(user))
+      setSuggestions([])
+      setError("")
+    },
+    [dispatch]
+  )
 
   return (
     <div className="profile-modal">
@@ -63,17 +108,31 @@ export default function Profile() {
       <SearchBar onChange={onSearchQueryChange} />
 
       <div className="profile-actions">
-        {suggestions.length > 0 ? (
-          <SearchResults />
+        {loading ? (
+          <div className="loading">{t("loading")}</div>
+        ) : error ? (
+          <div className="error">{error}</div>
         ) : searchedUser ? (
-          <OtherProfileActions rightPanel={rightPanel} setRightPanel={setRightPanel} />
+          <OtherProfileActions
+            rightPanel={rightPanel}
+            setRightPanel={setRightPanel}
+          />
+        ) : suggestions.length > 0 ? (
+          <SearchResults
+            suggestions={suggestions}
+            onSelect={(suggestion) => searchById(suggestion.id)}
+          />
         ) : (
           <MyProfileMenu />
         )}
       </div>
 
-      {rightPanel === "game" && profile && <GameHistory uid={profile.uid} onUpdate={setGameHistory} />}
-      {rightPanel === "chat" && profile && <ProfileChatHistory uid={profile.uid} />}
+      {rightPanel === "game" && profile && (
+        <GameHistory uid={profile.uid} onUpdate={setGameHistory} />
+      )}
+      {rightPanel === "chat" && profile && (
+        <ProfileChatHistory uid={profile.uid} />
+      )}
     </div>
   )
 }
@@ -83,7 +142,7 @@ function MyProfileMenu() {
   return (
     <Tabs>
       <TabList>
-        <Tab>{t("name")}</Tab>
+        <Tab>{t("progress")}</Tab>
         <Tab>{t("avatar")}</Tab>
         <Tab>{t("title_label")}</Tab>
         <Tab>{t("gadgets")}</Tab>
@@ -91,7 +150,7 @@ function MyProfileMenu() {
       </TabList>
 
       <TabPanel>
-        <NameTab />
+        <ProgressTab />
       </TabPanel>
       <TabPanel>
         <AvatarTab />
@@ -110,11 +169,10 @@ function MyProfileMenu() {
 }
 
 function OtherProfileActions(props: {
-  rightPanel: "game" | "chat",
+  rightPanel: "game" | "chat"
   setRightPanel: React.Dispatch<React.SetStateAction<"game" | "chat">>
 }) {
   const { t } = useTranslation()
-  const dispatch = useAppDispatch()
   const currentUid = useAppSelector((state) => state.network.profile?.uid)
   const role = useAppSelector((state) => state.network.profile?.role)
   const user = useAppSelector((state) => state.lobby.searchedUser)
@@ -126,26 +184,13 @@ function OtherProfileActions(props: {
       <button
         className="bubbly green"
         onClick={() => {
-          dispatch(
-            giveBooster({
-              numberOfBoosters: Number(prompt("How many boosters ?")) || 1,
-              uid: user.uid
-            })
-          )
-        }}
-      >{t("give_boosters")}
-      </button>
-    ) : null
-
-  const heapSnapshotButton =
-    user && role && role === Role.ADMIN ? (
-      <button
-        className="bubbly red"
-        onClick={() => {
-          dispatch(heapSnapshot())
+          giveBooster({
+            numberOfBoosters: Number(prompt("How many boosters ?")) || 1,
+            uid: user.uid
+          })
         }}
       >
-        {t("heap_snapshot")}
+        {t("give_boosters")}
       </button>
     ) : null
 
@@ -155,7 +200,7 @@ function OtherProfileActions(props: {
         className="bubbly red"
         onClick={() => {
           const reason = prompt(`Reason for the ban:`)
-          dispatch(ban({ uid: user.uid, reason: reason ? reason : "" }))
+          ban({ uid: user.uid, reason: reason ?? "" })
         }}
       >
         {t("ban_user")}
@@ -167,7 +212,8 @@ function OtherProfileActions(props: {
       <button
         className="bubbly red"
         onClick={() => {
-          dispatch(unban({ uid: user.uid, name: user.displayName }))
+          const reason = prompt(`Reason for the unban:`)
+          unban({ uid: user.uid, reason: reason ?? "" })
         }}
       >
         {t("unban_user")}
@@ -204,7 +250,7 @@ function OtherProfileActions(props: {
         <button
           className="bubbly orange"
           onClick={() => {
-            dispatch(giveRole({ uid: user.uid, role: profileRole }))
+            giveRole({ uid: user.uid, role: profileRole })
             alert(`Role ${profileRole} given to ${user.displayName}`)
           }}
         >
@@ -231,7 +277,7 @@ function OtherProfileActions(props: {
         <button
           className="bubbly blue"
           onClick={() => {
-            dispatch(giveTitle({ uid: user.uid, title: title }))
+            giveTitle({ uid: user.uid, title: title })
             alert(`Title ${title} given to ${user.displayName}`)
           }}
         >
@@ -255,14 +301,15 @@ function OtherProfileActions(props: {
   return role === Role.ADMIN || role === Role.MODERATOR ? (
     <>
       {giveButton}
-      {heapSnapshotButton}
       {roleButton}
       {titleButton}
       {user?.banned ? unbanButton : banButton}
       {props.rightPanel === "game" ? chatHistoryButton : gameHistoryButton}
-      {currentUid && user && user.uid !== currentUid && <button className="bubbly blue" onClick={() => dispatch(searchById(currentUid))}>
-        {t("back_to_my_profile")}
-      </button>}
+      {currentUid && user && user.uid !== currentUid && (
+        <button className="bubbly blue" onClick={() => searchById(currentUid)}>
+          {t("back_to_my_profile")}
+        </button>
+      )}
     </>
   ) : null
 }

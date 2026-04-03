@@ -1,13 +1,17 @@
+import path from "node:path"
 import { createObjectCsvWriter } from "csv-writer"
-import { Pkm, PkmDuos, PkmFamily, PkmIndex } from "../app/types/enum/Pokemon"
+import { PkmAltForms } from "../app/config"
 import PokemonFactory from "../app/models/pokemon-factory"
-import { Ability } from "../app/types/enum/Ability"
-import { logger } from "../app/utils/logger"
-import { Synergy } from "../app/types/enum/Synergy"
 import { getPokemonData } from "../app/models/precomputed/precomputed-pokemon-data"
+import { Ability } from "../app/types/enum/Ability"
+import { Pkm, PkmDuos, PkmFamily, PkmIndex } from "../app/types/enum/Pokemon"
+import { Synergy } from "../app/types/enum/Synergy"
+import { logger } from "../app/utils/logger"
+
+const EXPORT_PATH = "../app/models/precomputed/pokemons-data.csv"
 
 const csvWriter = createObjectCsvWriter({
-  path: "../app/models/precomputed/pokemons-data.csv",
+  path: EXPORT_PATH,
   header: [
     { id: "index", title: "Index" },
     { id: "name", title: "Name" },
@@ -33,7 +37,8 @@ const csvWriter = createObjectCsvWriter({
     { id: "familyType4", title: "Family Type 4" },
     { id: "duo", title: "Duo" },
     { id: "regional", title: "Regional" },
-    { id: "stages", title: "Nb stages" }
+    { id: "stages", title: "Nb stages" },
+    { id: "variant", title: "Variant" }
   ]
 })
 
@@ -45,6 +50,7 @@ interface PokemonData {
   stages: number
   additional: boolean
   regional: boolean
+  variant: boolean
   type1: string
   type2: string
   type3: string
@@ -74,7 +80,7 @@ export function csvExport() {
       const pokemon = PokemonFactory.createPokemonFromName(pkm)
       const pokemonData = getPokemonData(pkm)
       if (pokemon.skill != Ability.DEFAULT) {
-        const family = Object.keys(PkmFamily).filter(
+        const family = (Object.keys(PkmFamily) as Pkm[]).filter(
           (p) => PkmFamily[p] === PkmFamily[pkm]
         )
         const types: Synergy[] = pokemonData.types
@@ -92,11 +98,12 @@ export function csvExport() {
           name: pkm,
           category: pokemon.rarity,
           tier: pokemon.stars,
-          stages:
-            pokemon.stages ??
-            Math.max(...family.map((p) => getPokemonData(p as Pkm).stars)),
+          stages: Math.max(
+            ...family.map((p) => getPokemonData(p as Pkm).stars)
+          ),
           additional: pokemonData.additional,
           regional: pokemonData.regional,
+          variant: PkmAltForms.includes(pkm),
           duo: Object.values(PkmDuos).some((duo) => duo.includes(pkm)),
           type1: types[0] ?? "",
           type2: types[1] ?? "",
@@ -119,7 +126,11 @@ export function csvExport() {
       }
     })
 
+  const resolvedPath = path.resolve(__dirname, EXPORT_PATH)
+
   csvWriter
     .writeRecords(data)
-    .then(() => logger.info("CSV export done successfully"))
+    .then(() => logger.info(`CSV export done successfully: ${resolvedPath}`))
 }
+
+csvExport()

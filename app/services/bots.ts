@@ -1,72 +1,86 @@
-import { BotV2, IBot, IStep } from "../models/mongo-models/bot-v2"
-import { nanoid } from "nanoid"
+import { logger } from "colyseus"
 import { mongo } from "mongoose"
-import { logger, matchMaker } from "colyseus"
-import { rewriteBotRoundsRequiredto1, validateBot } from "../core/bot-logic"
+import { BotV2, IBot, IStep } from "../models/mongo-models/bot-v2"
+import { IUserMetadataMongo } from "../types/interfaces/UserMetadata"
 import { discordService } from "./discord"
-import { IUserMetadata } from "../models/mongo-models/user-metadata"
 
-export async function fetchBots() {
-  const bots = new Map<string, IBot>()
-  const ids = new Array<string>()
-  const chunkSize = 100
-  let skip = 0
+export type IBotListItem = Omit<IBot, "steps">
 
-  while (true) {
-    const botsData = await BotV2.find(
-      {},
-      {},
-      { sort: { elo: -1 }, limit: chunkSize, skip }
-    )
-    if (!botsData || botsData.length === 0) break
+export async function fetchBotsList(
+  approved?: boolean,
+  usingPkm?: string
+): Promise<IBotListItem[]> {
+  const pageSize = 100
+  const maxPages = 20 // Fail-safe: prevent infinite loops (max 2000 bots)
+  const allBots: IBotListItem[] = []
 
-    botsData.forEach((bot) => {
-      if (ids.includes(bot.id)) {
-        const id = nanoid()
-        bot.id = id
-        bot.save()
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  let page = 0
+  let hasMoreData = true
+
+  while (hasMoreData && page < maxPages) {
+    try {
+      // Build the query filter - apply approved filter at database level, not after
+      const queryFilter: any = {}
+      if (approved !== undefined) {
+        queryFilter.approved = approved
       }
-      ids.push(bot.id)
-      bots.set(bot.id, bot)
-      matchMaker.presence.hset("bots", bot.id, JSON.stringify(bot))
-    })
+      if (usingPkm) {
+        queryFilter["steps.board.name"] = usingPkm
+      }
 
-    skip += chunkSize
-  }
+      const botsData = await BotV2.find(
+        queryFilter, // Apply filter in the database query
+        { steps: 0 }, // Exclude the 'steps' field
+        { sort: { elo: -1, id: 1 }, limit: pageSize, skip: page * pageSize } // Add secondary sort by id for stable pagination
+      ).lean()
 
-  return bots
-}
+      if (!botsData || botsData.length === 0) {
+        hasMoreData = false
+        break
+      }
 
-export async function getBotsList(
-  approved?: boolean
-): Promise<Partial<IBot>[]> {
-  const bots = Object.values(await matchMaker.presence.hgetall("bots")).map(
-    (bot) => JSON.parse(bot) as IBot
-  )
-  return bots
-    .filter((bot) => approved === undefined || bot.approved === approved)
-    .map((bot) => {
-      const errors = validateBot(rewriteBotRoundsRequiredto1(bot))
-      return {
+      const processedBots = botsData.map((bot) => ({
         name: bot.name,
         avatar: bot.avatar,
         id: bot.id,
         approved: bot.approved,
         author: bot.author,
-        elo: bot.elo,
-        valid: errors.length === 0
+        elo: bot.elo
+      }))
+
+      // Use push.apply to add elements without creating intermediate arrays
+      allBots.push(...processedBots)
+
+      if (botsData.length < pageSize) {
+        // Last chunk
+        hasMoreData = false
+      } else {
+        // Wait briefly before fetching next page to not block the event loop
+        await wait(100)
+        page++
       }
-    })
+    } catch (error) {
+      logger.error(`Error fetching bots page ${page}:`, error)
+      hasMoreData = false // Stop on error to prevent infinite loop
+    }
+  }
+
+  if (page >= maxPages) {
+    logger.warn(`Reached maximum page limit (${maxPages}) while fetching bots`)
+  }
+
+  return allBots
 }
 
-export async function getBotData(id: string): Promise<IBot | undefined> {
+export async function fetchBot(id: string): Promise<IBot | null> {
   try {
-    const json = await matchMaker.presence.hget("bots", id)
-    if (!json) return undefined
-    return JSON.parse(json) as IBot
+    const bot: IBot | null = await BotV2.findOne({ id }, {})
+    return bot
   } catch (e) {
-    logger.error(`Error parsing bot data id ${id}: ${e}`)
-    return undefined
+    logger.error(`Error fetching bot data id ${id}: ${e}`)
+    return null
   }
 }
 
@@ -89,25 +103,19 @@ export async function addBotToDatabase(bot: {
     elo: bot.elo ?? 1200,
     author: bot.author,
     steps: bot.steps,
-    id: nanoid()
+    id: crypto.randomUUID()
   })
 
   logger.info(`Bot with id ${resultCreate.id} created`)
-  matchMaker.presence.hset(
-    "bots",
-    resultCreate.id,
-    JSON.stringify(resultCreate)
-  )
   discordService.announceBotCreation(resultCreate)
   return resultCreate
 }
 
 export async function deleteBotFromDatabase(
   botId: string,
-  user: IUserMetadata
+  user: IUserMetadataMongo
 ): Promise<mongo.DeleteResult> {
   const resultDelete = await BotV2.deleteOne({ id: botId })
-  matchMaker.presence.hdel("bots", botId)
   if (resultDelete.deletedCount > 0) {
     logger.info(`Bot with id ${botId} has been deleted by ${user.displayName}`)
   } else {
@@ -120,7 +128,7 @@ export async function deleteBotFromDatabase(
 export async function approveBot(
   botId: string,
   approved: boolean,
-  user: IUserMetadata
+  user: IUserMetadataMongo
 ): Promise<mongo.UpdateResult> {
   logger.debug(
     `${user.displayName} is ${approved ? "approving" : "disapproving"} bot ${botId}`
@@ -128,9 +136,6 @@ export async function approveBot(
   const result = await BotV2.updateOne({ id: botId }, { $set: { approved } })
   if (result.modifiedCount > 0) {
     logger.info(`Bot with id ${botId} ${approved ? "approved" : "disapproved"}`)
-    const botInRam = JSON.parse(await matchMaker.presence.hget("bots", botId))
-    botInRam.approved = approved
-    await matchMaker.presence.hset("bots", botId, JSON.stringify(botInRam))
   } else {
     logger.warn(`Bot with id ${botId} not found`)
   }

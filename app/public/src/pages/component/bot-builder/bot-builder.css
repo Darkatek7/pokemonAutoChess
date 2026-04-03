@@ -23,6 +23,7 @@
   width: 1440px;
   max-width: 100%;
   margin: 0 auto;
+  gap: 0.5em;
 }
 
 #bot-builder .step-control {
@@ -66,7 +67,7 @@
 }
 
 #bot-builder #team-editor tr:nth-child(2) td:nth-child(4) {
-  background-image: url("assets/ui/lightcell.png?raw");
+  background-image: url("assets/environment/lightcell.png?raw");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

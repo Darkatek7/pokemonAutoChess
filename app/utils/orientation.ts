@@ -1,6 +1,7 @@
-import Board, { Cell } from "../core/board"
+import { Board, Cell } from "../core/board"
 import { PokemonEntity } from "../core/pokemon-entity"
 import { Orientation } from "../types/enum/Game"
+import { distanceC } from "./distance"
 
 export const OrientationVector: Record<Orientation, [number, number]> = {
   [Orientation.UP]: [0, 1],
@@ -13,22 +14,34 @@ export const OrientationVector: Record<Orientation, [number, number]> = {
   [Orientation.UPLEFT]: [-1, 1]
 }
 
+export const OrientationAngle: Record<Orientation, number> = {
+  [Orientation.UP]: Math.PI / 2,
+  [Orientation.UPRIGHT]: Math.PI / 4,
+  [Orientation.RIGHT]: 0,
+  [Orientation.DOWNRIGHT]: -Math.PI / 4,
+  [Orientation.DOWN]: -Math.PI / 2,
+  [Orientation.DOWNLEFT]: (-3 * Math.PI) / 4,
+  [Orientation.LEFT]: Math.PI,
+  [Orientation.UPLEFT]: (3 * Math.PI) / 4
+}
+
 export const OrientationArray: Orientation[] = [
-  Orientation.UP,
-  Orientation.UPRIGHT,
-  Orientation.RIGHT,
-  Orientation.DOWNRIGHT,
   Orientation.DOWN,
-  Orientation.DOWNLEFT,
+  Orientation.DOWNRIGHT,
+  Orientation.RIGHT,
+  Orientation.UPRIGHT,
+  Orientation.UP,
+  Orientation.UPLEFT,
   Orientation.LEFT,
-  Orientation.UPLEFT
+  Orientation.DOWNLEFT
 ]
 
-export function effectInLine(
+export function effectInOrientation(
   board: Board,
   pokemon: PokemonEntity,
   target: PokemonEntity | Orientation,
-  effect: (cell: Cell) => void
+  effect: (cell: Cell) => void,
+  maxRange?: number
 ) {
   const orientation: Orientation =
     target instanceof PokemonEntity
@@ -45,8 +58,14 @@ export function effectInLine(
   const targetsHit = new Set()
 
   const applyEffect = (x: number, y: number) => {
-    const value = board.getValue(x, y)
-    if (value != null) {
+    if (maxRange != null) {
+      const distance = distanceC(x, y, pokemon.positionX, pokemon.positionY)
+      if (distance > maxRange) {
+        return
+      }
+    }
+    const value = board.getEntityOnCell(x, y)
+    if (value != null && value.team !== pokemon.team) {
       targetsHit.add(value)
     }
     effect({ x, y, value })
@@ -118,7 +137,9 @@ export function effectInLine(
       break
   }
 
-  if (target instanceof PokemonEntity && targetsHit.has(target) === false) {
+  const isEntity = (obj: PokemonEntity | Orientation): obj is PokemonEntity =>
+    obj.hasOwnProperty("positionX")
+  if (isEntity(target) && targetsHit.size === 0) {
     // should at least touch the original target
     // this can happen when target has an angle in between 45 degrees modulo, see https://discord.com/channels/737230355039387749/1098262507505848523
     effect({ x: target.positionX, y: target.positionY, value: target })
@@ -151,4 +172,26 @@ export function getOrientation(x1: number, y1: number, x2: number, y2: number) {
   } else {
     return Orientation.RIGHT
   }
+}
+
+export function effectInLine(
+  board: Board,
+  pokemon: PokemonEntity,
+  target: PokemonEntity,
+  effect: (cell: Cell) => void
+) {
+  const angleToTarget = Math.atan2(
+    target.positionY - pokemon.positionY,
+    target.positionX - pokemon.positionX
+  )
+  const distance = 12 // sufficiently large to cover the whole board in diagonal
+  const finalX = Math.round(
+    pokemon.positionX + distance * Math.cos(angleToTarget)
+  )
+  const finalY = Math.round(
+    pokemon.positionY + distance * Math.sin(angleToTarget)
+  )
+  board
+    .getCellsBetween(pokemon.positionX, pokemon.positionY, finalX, finalY)
+    .forEach(effect)
 }

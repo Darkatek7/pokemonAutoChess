@@ -1,5 +1,4 @@
-import { Schema, model } from "mongoose"
-import { nanoid } from "nanoid"
+import { model, Schema } from "mongoose"
 import { Emotion, PkmWithCustom } from "../../types"
 import { Item } from "../../types/enum/Item"
 import { Pkm } from "../../types/enum/Pokemon"
@@ -78,7 +77,7 @@ const bot = new Schema(
     id: {
       type: String,
       required: true,
-      default: nanoid()
+      default: crypto.randomUUID()
     },
     approved: {
       type: Boolean,
@@ -103,7 +102,7 @@ const bot = new Schema(
   },
   {
     toJSON: {
-      transform: function (doc, ret) {
+      transform: function (doc, ret: any) {
         delete ret._id
         delete ret.__v
         if (ret.steps)
@@ -119,4 +118,5 @@ const bot = new Schema(
 )
 
 const BotV2 = model<IBot>("botV2", bot)
+
 export { BotV2 }

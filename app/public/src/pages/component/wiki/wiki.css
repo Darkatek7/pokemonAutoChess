@@ -27,10 +27,6 @@
   margin: -6px -12px;
 }
 
-.wiki-modal {
-  overflow: visible;
-}
-
 #wiki-page .wiki-types li[role="tab"] {
   padding: 4px;
   line-height: 40px;
@@ -38,45 +34,17 @@
   text-align: center;
 }
 
-#wiki-page .synergy-overlaps {
-  display: grid;
-  max-width: 300px;
-  grid-template-columns: repeat(auto-fit, 80px);
-  gap: 0.5em;
-  margin: 1em;
-}
-
-.synergy-overlaps li {
-  display: flex;
-  align-items: center;
-  background-color: var(--color-bg-secondary);
-  border-radius: 8px;
-  background-color: var(--color-bg-secondary);
-  border: var(--border-extra-thin);
-  cursor: var(--cursor-hover);
-}
-
-.synergy-overlaps li.active {
-  background-color: var(--color-bg-accent);
-}
-
-.synergy-overlaps li > img:nth-child(2) {
-  margin-left: -25px;
-  z-index: 2;
-}
-
 #wiki-page > .react-tabs > .react-tabs__tab-panel {
   height: 75vh;
-  padding: 0.5em 0 40px 0;
+  padding: 0.5em 0 0 0;
   overflow-y: auto;
-  scrollbar-gutter: stable;
 }
 
 #wiki-page .pokemon-name {
   text-transform: capitalize;
 }
 
-#wiki-page .pokemon-portrait {
+#wiki-page .wiki-types .pokemon-portrait {
   margin: 2px;
 }
 
@@ -85,10 +53,11 @@
   border-radius: 2px;
 }
 
-#wiki-page .wiki-pokemons .pokemon-typeahead {
+#wiki-page .filters {
   float: right;
-  font-size: 80%;
-  padding: 0px 16px 0px 8px;
+  display: flex;
+  gap: 0.5em;
+  font-size: 90%;
 }
 
 #wiki-page p.description {
@@ -156,8 +125,8 @@
 }
 
 #wiki-page .wiki-tutorials ul {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
   gap: 0.5em;
   padding: 0;
 }
@@ -167,8 +136,8 @@
 }
 
 #wiki-page .wiki-tutorials iframe {
-  width: 560px;
-  height: 315px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   max-width: 100%;
 }
 
@@ -190,13 +159,15 @@
   flex-wrap: wrap;
 }
 
-#wiki-weather > ul {
+#wiki-weather > ul,
+#wiki-town > ul {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(20em, 1fr));
   gap: 0.5em;
 }
 
-#wiki-weather > ul > .my-box {
+#wiki-weather > ul > .my-box,
+#wiki-town > ul > .my-box {
   display: flex;
   flex-direction: column;
   gap: 0.5em;
@@ -207,11 +178,10 @@
   font-size: 2rem;
 }
 
-#wiki-ability > ul {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(20em, 1fr));
-  gap: 0.5em;
-  margin: 0;
+#wiki-ability {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 #wiki-ability > ul > .my-box {
@@ -220,10 +190,10 @@
   gap: 5px;
 }
 
-#wiki-regions > ul {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(20em, 1fr));
-  gap: 0.5em;
+#wiki-regions {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 #wiki-regions > ul > .my-box {
@@ -254,16 +224,18 @@
   right: 1em;
   display: flex;
   gap: 5px;
-  flex-wrap: wrap;
+  flex-wrap: wrap-reverse;
 }
 
-#wiki-weather .my-box header {
+#wiki-weather .my-box header,
+#wiki-town .my-box header {
   display: flex;
   align-items: center;
   gap: 0.5em;
 }
 
-#wiki-weather .my-box h2 {
+#wiki-weather .my-box h2,
+#wiki-town .my-box h2 {
   flex: 1;
   margin: 0;
   font-size: 2rem;
@@ -274,7 +246,8 @@
   height: 40px;
 }
 
-#wiki-weather .my-box p {
+#wiki-weather .my-box p,
+#wiki-town .my-box p {
   margin: 0;
   white-space: pre-line;
 }
@@ -312,6 +285,10 @@
 
 #wiki-items article {
   padding: 1em;
+}
+
+#wiki-items h2 {
+  margin-bottom: 0.25em;
 }
 
 #wiki-items ul {

@@ -1,31 +1,36 @@
 import React from "react"
 import { Tooltip } from "react-tooltip"
+import { RarityColor } from "../../../../../config"
+import { getPkmWithCustom } from "../../../../../models/colyseus-models/pokemon-customs"
 import { getPokemonData } from "../../../../../models/precomputed/precomputed-pokemon-data"
-import { RarityColor } from "../../../../../types/Config"
 import { PkmDuo, PkmDuos } from "../../../../../types/enum/Pokemon"
-import { selectCurrentPlayer, useAppSelector } from "../../../hooks"
-import { getPortraitSrc } from "../../../../../utils/avatar"
+import { selectSpectatedPlayer, useAppSelector } from "../../../hooks"
 import { cc } from "../../utils/jsx"
 import SynergyIcon from "../icons/synergy-icon"
 import { GamePokemonDetail } from "./game-pokemon-detail"
-import { getPkmWithCustom } from "../../../../../models/colyseus-models/pokemon-customs"
+import { getCachedPortrait } from "./game-pokemon-portrait"
 import "./game-pokemon-portrait.css"
 
 export default function GamePokemonDuoPortrait(props: {
   index: number
-  origin: string
+  origin: "proposition"
   duo: PkmDuo
   click?: React.MouseEventHandler<HTMLDivElement>
   inPlanner?: boolean
 }) {
   const duo = PkmDuos[props.duo].map((p) => getPokemonData(p))
   const rarityColor = RarityColor[duo[0].rarity]
-  const currentPlayer = useAppSelector(selectCurrentPlayer)
-  const duoCustom = duo.map((p) => getPkmWithCustom(p.index, currentPlayer?.pokemonCustoms))
+  const spectatedPlayer = useAppSelector(selectSpectatedPlayer)
+  const duoCustom = duo.map((p) =>
+    getPkmWithCustom(p.index, spectatedPlayer?.pokemonCustoms)
+  )
 
   return (
     <div
-      className={cc(`my-container game-pokemon-portrait game-pokemon-portrait-duo`, { planned: props.inPlanner ?? false })}
+      className={cc(
+        `my-container game-pokemon-portrait game-pokemon-portrait-duo`,
+        { planned: props.inPlanner ?? false }
+      )}
       style={{
         backgroundColor: rarityColor,
         borderColor: rarityColor
@@ -41,11 +46,7 @@ export default function GamePokemonDuoPortrait(props: {
             )}
             data-tooltip-id={`tooltip-${props.origin}-${props.index}-${p.index}`}
             style={{
-              backgroundImage: `url("${getPortraitSrc(
-                p.index,
-                duoCustom[i]?.shiny,
-                duoCustom[i]?.emotion
-              )}")`
+              backgroundImage: `url("${getCachedPortrait(p.index, spectatedPlayer?.pokemonCustoms)}")`
             }}
           ></div>
           <Tooltip
@@ -57,6 +58,7 @@ export default function GamePokemonDuoPortrait(props: {
               pokemon={p.name}
               emotion={duoCustom[i]?.emotion}
               shiny={duoCustom[i]?.shiny}
+              origin={props.origin}
             />
           </Tooltip>
         </React.Fragment>
