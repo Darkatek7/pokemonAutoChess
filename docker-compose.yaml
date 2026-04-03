@@ -1,14 +1,4 @@
 services:
-
-  mongo:
-    image: mongo:8.2.6-noble
-    restart: always
-    ports:
-      - 27017:27017
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
-
   app:
     build:
       context: .
@@ -25,4 +15,4 @@ services:
       FIREBASE_APP_ID: ${FIREBASE_APP_ID}
       FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL}
       FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY}
-      MONGO_URI: "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/dev?authSource=admin"
+      MONGO_URI: ${MONGO_URI}
