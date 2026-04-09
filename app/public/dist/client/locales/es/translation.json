@@ -3158,7 +3158,7 @@
 		"BABY_CHANCE_STACKED": "\n\nProbabilidad acumulada: {{eggChance}}%",
 		"DRAGON_STARS": "\nBonus actual: {{totalStars}} STAR",
 		"LIGHT": "La LIGHT revela un foco en el campo de batalla. La unidad que se encuentra en el foco de luz al comienzo del combate obtiene bonificaciones únicas.",
-		"WILD": "Los Pokémon WILD solo se encuentran durante las rondas JcE cuando la sinergia no está activa (8% de probabilidad base). Sus ataques tienen un [25,LK]% de probabilidad de infligir WOUND durante 3 segundos.{{additionalInfo}}",
+		"WILD": "Los Pokémon WILD solo se encuentran durante las rondas JcE cuando la sinergia no está activa (6% de probabilidad base). Sus ataques tienen un [25,LK]% de probabilidad de infligir WOUND durante 3 segundos.{{additionalInfo}}",
 		"WILD_ADDITIONAL": "\nPosibilidades actuales de encontrar un Pokémon WILD : {{wildChance}}%",
 		"AMORPHOUS": "Los Pokémon AMOPRHOUS son extremadamente flexibles y carecen de una forma propia. Tu equipo gana HP y SPEED al activar una gran variedad de sinergias.",
 		"GOURMET": "Los Pokémon GOURMET pueden llevar un CHEF_HAT. Los cocineros prepararán sus platos insignia después de cada batalla y se los darán a sus aliados ADJACENT, otorgándoles mejoras y efectos variados."
@@ -3313,7 +3313,7 @@
 		"SURVIVOR": "Gana un juego con solo 1 HP restante",
 		"GAMBLER": "Vuelve a refrescar la tienda más de 60 veces en una sola partida",
 		"NATURAL": "Gana una partida haciendo reroll menos de 20 veces",
-		"BOT_BUILDER": "Alcanza el nivel 20 para desbloquear el Bot Builder",
+		"BOT_BUILDER": "Alcanza el nivel 40 para desbloquear el Bot Builder",
 		"SHINY_SEEKER": "Ten más de 30 avatares de Pokémon Variocolor.",
 		"ARCHEOLOGIST": "Descifrar el mensaje secreto de los Unowns",
 		"PRIMAL": "Obtén a Groudon Primigenio, Kyogre Primigenio o Mega Rayquaza",

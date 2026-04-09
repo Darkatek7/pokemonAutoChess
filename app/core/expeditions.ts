@@ -1,6 +1,6 @@
 import { t } from "i18next"
 import { precomputedPokemons } from "../../gen/precomputed-pokemons"
-import { RegionDetails, SynergyTriggers } from "../config"
+import { getBaseAltForm, RegionDetails, SynergyTriggers } from "../config"
 import {
   CraftableItemsNoScarves,
   Item,
@@ -129,13 +129,21 @@ export function getExpeditionData(
         Rarity.EPIC,
         Rarity.LEGENDARY
       ][rankIndex]
-      const pokemonsOfCategory = precomputedPokemons.filter(
-        (p) =>
-          p.stars === (expedition.rank === "E" ? 2 : 3) && p.rarity === rarity
-      )
+      const pokemonsOfCategory = precomputedPokemons
+        .filter(
+          (p) =>
+            p.stars === (expedition.rank === "E" ? 2 : 3) && p.rarity === rarity
+        )
+        .filter(
+          (p, index, arr) =>
+            arr.findIndex(
+              (p2) => getBaseAltForm(p2.name) === getBaseAltForm(p.name)
+            ) === index
+        ) // get only base alt forms
+      console.log({ pokemonsOfCategory: pokemonsOfCategory.map((p) => p.name) })
       const pokemonToRescue =
-        pokemonsOfCategory[expedition.hash % pokemonsOfCategory.length]
-      return { pokemon: pokemonToRescue.name }
+        pokemonsOfCategory[expedition.hash % pokemonsOfCategory.length].name
+      return { pokemon: pokemonToRescue }
     }
 
     case ExpeditionType.EXPLORATION: {
