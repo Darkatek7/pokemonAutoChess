@@ -1,12 +1,12 @@
 import firebase from "firebase/compat/app"
-import React, { useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
   BOTS_ENABLED,
   EloRankThreshold,
   MAX_PLAYERS_PER_GAME
 } from "../../../../../config"
-import { IGameUser } from "../../../../../models/colyseus-models/game-user"
+import type { IGameUser } from "../../../../../models/colyseus-models/game-user"
 import { Role } from "../../../../../types"
 import { EloRank } from "../../../../../types/enum/EloRank"
 import { BotDifficulty, GameMode } from "../../../../../types/enum/Game"
@@ -32,6 +32,7 @@ import { GameModeIcon } from "../icons/game-mode-icon"
 import { BotSelectModal } from "./bot-select-modal"
 import PreparationMenuUser from "./preparation-menu-user"
 import "./preparation-menu.css"
+import { keys } from "../../../../../utils/object"
 
 export default function PreparationMenu() {
   const { t } = useTranslation()
@@ -86,19 +87,22 @@ export default function PreparationMenu() {
   }, [nbUsersReady, users.length, allUsersReady])
 
   const humans = users.filter((u) => !u.isBot)
-  const iseligibleForELO =
-    gameMode === GameMode.CLASSIC || users.filter((u) => !u.isBot).length >= 2
-  const averageElo = Math.round(
-    humans.reduce((acc, u) => acc + u.elo, 0) / humans.length
-  )
+  const isEligibleForELO = gameMode === GameMode.CLASSIC || humans.length >= 2
+  const averageElo =
+    humans.length > 0
+      ? Math.round(humans.reduce((acc, u) => acc + u.elo, 0) / humans.length)
+      : 0
 
   function togglePrivate() {
     if (password === null || password === undefined) {
       // generate a random password made of 4 characters
-      const newPassword = Math.random()
-        .toString(36)
-        .substring(2, 6)
-        .toUpperCase()
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+      const randomBytes = new Uint8Array(4)
+      crypto.getRandomValues(randomBytes)
+      const newPassword = Array.from(
+        randomBytes,
+        (b) => chars[b % chars.length]
+      ).join("")
       changeRoomPassword(newPassword)
     } else {
       changeRoomPassword(null)
@@ -169,7 +173,7 @@ export default function PreparationMenu() {
           />
           {t("no_elo_hint")}
         </p>
-      ) : iseligibleForELO ? (
+      ) : isEligibleForELO ? (
         <p>
           {t("eligible_elo_hint")} {t("average_elo")}: {averageElo} ;{" "}
           {t("GLHF")}
@@ -237,9 +241,9 @@ export default function PreparationMenu() {
           value={specialGameRule ?? "none"}
         >
           <option value="none">{t("no_rule")}</option>
-          {Object.values(SpecialGameRule).map((rule) => (
+          {keys(SpecialGameRule).map((rule) => (
             <option key={rule} value={rule}>
-              {t("scribble." + rule)}
+              {t(`scribble.${rule}`)}
             </option>
           ))}
         </select>
@@ -287,9 +291,9 @@ export default function PreparationMenu() {
         </button>
 
         <select
-          defaultValue={botDifficulty}
+          value={botDifficulty}
           onChange={(e) => {
-            setBotDifficulty(parseInt(e.target.value))
+            setBotDifficulty(parseInt(e.target.value, 10))
           }}
         >
           <option value={BotDifficulty.EASY}>{t("easy_bot")}</option>
@@ -360,27 +364,27 @@ export default function PreparationMenu() {
       </div>
 
       <div className="actions">
-        {roomNameInput}
-        <div className="spacer" />
-        {scribbleRule}
-      </div>
+        <div>
+          {roomNameInput}
+          <div className="spacer" />
+          {scribbleRule}
+        </div>
 
-      {(BOTS_ENABLED || isAdmin) && (
-        <div className="actions">{botControls}</div>
-      )}
+        {(BOTS_ENABLED || isAdmin) && <div>{botControls}</div>}
 
-      <div className="actions">
-        {roomEloButton}
-        {minMaxRanks}
-        <div className="spacer" />
-      </div>
+        <div>
+          {roomEloButton}
+          {minMaxRanks}
+          <div className="spacer" />
+        </div>
 
-      <div className="actions">
-        {roomPrivateButton}
-        {roomInfo}
-        <div className="spacer" />
-        {readyButton}
-        {startGameButton}
+        <div>
+          {roomPrivateButton}
+          {roomInfo}
+          <div className="spacer" />
+          {readyButton}
+          {startGameButton}
+        </div>
       </div>
 
       {isOwner && showBotSelectModal && (
@@ -409,7 +413,7 @@ export function RankSelect(props: {
       >
         {Object.values(EloRank).map((rank) => (
           <option key={rank} value={rank}>
-            {t("elorank." + rank)} ({EloRankThreshold[rank]})
+            {t(`elorank.${rank}`)} ({EloRankThreshold[rank]})
           </option>
         ))}
       </select>

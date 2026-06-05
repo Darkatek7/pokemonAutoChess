@@ -1,7 +1,7 @@
 import { SetSchema } from "@colyseus/schema"
 import Phaser, { GameObjects, Geom } from "phaser"
-import type MoveTo from "phaser3-rex-plugins/plugins/moveto"
-import type MoveToPlugin from "phaser3-rex-plugins/plugins/moveto-plugin"
+import type MoveTo from "phaser4-rex-plugins/plugins/moveto"
+import type MoveToPlugin from "phaser4-rex-plugins/plugins/moveto-plugin"
 import pkg from "../../../../../package.json"
 import {
   CELL_VISUAL_HEIGHT,
@@ -12,13 +12,16 @@ import {
 import {
   FLOWER_POTS_POSITIONS_BLUE,
   FLOWER_POTS_POSITIONS_RED,
-  FlowerMonByPot,
-  FlowerPots
+  FlowerMonByPot
 } from "../../../../core/flower-pots"
 import { getPokemonData } from "../../../../models/precomputed/precomputed-pokemon-data"
-import { type IPokemon, type IPokemonEntity } from "../../../../types"
 import {
-  AbilityAnimationArgs,
+  FlowerPots,
+  type IPokemon,
+  type IPokemonEntity
+} from "../../../../types"
+import {
+  type AbilityAnimationArgs,
   AttackSprite,
   AttackSpriteScale
 } from "../../../../types/Animation"
@@ -38,7 +41,7 @@ import {
   OrientationVector
 } from "../../../../utils/orientation"
 import { randomBetween } from "../../../../utils/random"
-import { values } from "../../../../utils/schemas"
+import { schemaValues } from "../../../../utils/schemas"
 import { GamePokemonDetailDOMWrapper } from "../../pages/component/game/game-pokemon-detail"
 import { transformEntityCoordinates } from "../../pages/utils/utils"
 import { preference } from "../../preferences"
@@ -51,7 +54,7 @@ import {
   displayBoost
 } from "./abilities-animations"
 import DraggableObject from "./draggable-object"
-import { GameDialog } from "./game-dialog"
+import type { GameDialog } from "./game-dialog"
 import ItemsContainer from "./items-container"
 import Lifebar from "./life-bar"
 import {
@@ -118,13 +121,15 @@ export default class PokemonSprite extends DraggableObject {
   playerId: string
   shouldShowTooltip: boolean
   flip: boolean
-  animationLocked: boolean /* will prevent another anim to play before current one is completed */ = false
+  /** Will prevent another anim to play before current one is completed. */
+  animationLocked: boolean = false
   skydiving: boolean = false
   dishes: Item[] = []
   dishesSprites: GameObjects.Sprite[] = []
   inBattle: boolean = false
   floatingTween?: Phaser.Tweens.Tween
   troopers?: PokemonSprite[]
+  isTeleporting: boolean = false
 
   constructor(
     scene: GameScene | DebugScene,
@@ -182,13 +187,13 @@ export default class PokemonSprite extends DraggableObject {
     const baseHP = getPokemonData(pokemon.name).hp
     const maxHP = inBattle
       ? pokemon.maxHP
-      : values(pokemon.items).reduce(
+      : schemaValues(pokemon.items).reduce(
           (acc, item) => acc + (ItemStats[item]?.[Stat.HP] ?? 0),
           pokemon.maxHP
         )
-    const sizeBuff = (maxHP - baseHP) / baseHP
+    const scale = 2 * Math.sqrt(1 + (pokemon.maxHP - baseHP) / baseHP)
     this.sprite
-      .setScale(2 + sizeBuff)
+      .setScale(scale)
       .setDepth(DEPTH.POKEMON)
       .setTint(getRegionTint(scene.mapName, preference("colorblindMode")))
 
@@ -215,7 +220,7 @@ export default class PokemonSprite extends DraggableObject {
         isGameScene(scene) &&
         scene.spectate === false
       ) {
-        this.shadow.setTintFill(0xff0000)
+        this.shadow.setTint(0xff0000).setTintMode(Phaser.TintModes.FILL)
       }
       this.add(this.shadow)
     }
@@ -238,10 +243,9 @@ export default class PokemonSprite extends DraggableObject {
 
     if (isEntity(pokemon)) {
       this.setLifeBar(pokemon, scene)
-      //this.setEffects(p, scene);
     } else {
       if (pokemon.dishes.size > 0) {
-        this.updateDishes(values(pokemon.dishes))
+        this.updateDishes(schemaValues(pokemon.dishes))
       }
     }
 
@@ -258,7 +262,7 @@ export default class PokemonSprite extends DraggableObject {
       this.scene.lastPokemonDetail = null
     }
 
-    this.lazyloadAnimations(scene).then(() => {
+    this.lazyLoadAnimations(scene).then(() => {
       if (!this.sprite.scene) return
       this.sprite.setTexture(
         scene.textures.exists(this.pokemon.index) ? this.pokemon.index : "0000"
@@ -287,7 +291,7 @@ export default class PokemonSprite extends DraggableObject {
     return this.pokemon.positionY
   }
 
-  lazyloadAnimations(scene: GameScene | DebugScene): Promise<void> {
+  lazyLoadAnimations(scene: GameScene | DebugScene): Promise<void> {
     return new Promise((resolve) => {
       const tint = this.pokemon.shiny ? PokemonTint.SHINY : PokemonTint.NORMAL
       const pokemonSpriteKey = `${this.pokemon.index}/${tint}`
@@ -301,7 +305,6 @@ export default class PokemonSprite extends DraggableObject {
 
       let spriteCount = spriteCountPerPokemon.get(pokemonSpriteKey) ?? 0
       if (spriteCount === 0 && scene?.animationManager) {
-        //logger.debug("loading anims for", this.pokemon.index)
         if (scene.textures.exists(this.pokemon.index) === false) {
           // needs to load the atlas & textures first
           loadCompressedAtlas(scene, this.pokemon.index).then(loadAnimations)
@@ -317,7 +320,6 @@ export default class PokemonSprite extends DraggableObject {
       }
       spriteCount++
 
-      //logger.debug("sprite count for", this.index, spriteCount)
       spriteCountPerPokemon.set(pokemonSpriteKey, spriteCount)
     })
   }
@@ -331,7 +333,6 @@ export default class PokemonSprite extends DraggableObject {
     let spriteCount = spriteCountPerPokemon.get(pokemonSpriteKey) ?? 0
     spriteCount = min(0)(spriteCount - 1)
     if (spriteCount === 0 && scene?.animationManager) {
-      //logger.debug("unloading anims for", indexToUnload, tintToUnload)
       scene.animationManager?.unloadPokemonAnimations(
         indexToUnload,
         tintToUnload
@@ -396,8 +397,6 @@ export default class PokemonSprite extends DraggableObject {
   }
 
   openDetail() {
-    const isGameScene = (scene: Phaser.Scene): scene is GameScene =>
-      "lastPokemonDetail" in scene
     if (!isGameScene(this.scene)) return
     this.scene.closeTooltips()
     if (this.scene.lastPokemonDetail && this.scene.lastPokemonDetail !== this) {
@@ -458,7 +457,7 @@ export default class PokemonSprite extends DraggableObject {
     }
   }
 
-  onPointerOver(pointer) {
+  onPointerOver(pointer: Phaser.Input.Pointer) {
     super.onPointerOver(pointer)
 
     if (
@@ -811,7 +810,8 @@ export default class PokemonSprite extends DraggableObject {
     onEntity: boolean
   ) {
     this.addElectricField()
-    this.sprite.postFX.addGlow(0xffff00, 4, 0, false, 0.1, 8)
+    this.sprite.enableFilters()
+    this.sprite.filters?.internal.addGlow(0xffff00, 4, 0, 0.1)
     this.emoteAnimation()
     if (!alreadyActive) {
       if (!preference("disableCameraShake")) scene.cameras.main.flash(250)
@@ -1290,7 +1290,7 @@ export default class PokemonSprite extends DraggableObject {
     }
   }
 
-  addPoison(stacks) {
+  addPoison(stacks: number) {
     const poisonTexture = stacks >= 3 ? "POISON_BADLY" : "POISON"
     if (!this.poison) {
       this.poison = this.scene.add
@@ -1298,7 +1298,7 @@ export default class PokemonSprite extends DraggableObject {
         .setScale(2)
       this.poison.anims.play(poisonTexture)
       this.add(this.poison)
-    } else if (this.poison.texture.key !== poisonTexture) {
+    } else if (this.poison.anims.currentAnim?.key !== poisonTexture) {
       this.poison.setTexture("status", `${poisonTexture}/000.png`)
       this.poison.anims.play(poisonTexture)
     }
@@ -1671,7 +1671,7 @@ export function loadCompressedAtlas(
         const multiatlas = {
           textures: [
             {
-              image: `${image}?v=${pkg.version}`,
+              image: `${image}?v=${pkg.assetsVersion}`,
               format: "RGBA8888",
               size: {
                 w: data.s[0],
@@ -1697,7 +1697,7 @@ export function loadCompressedAtlas(
     scene.load
       .json(
         `pokemon-atlas-${index}`,
-        `/assets/pokemons/${index}.json?v=${pkg.version}`
+        `/assets/pokemons/${index}.json?v=${pkg.assetsVersion}`
       )
       .start()
   })

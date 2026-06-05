@@ -1,4 +1,4 @@
-import { reverseMap } from "../../utils/map"
+import { objToMap, reverseMap } from "../../utils/map"
 import { Ability } from "./Ability"
 import { Synergy } from "./Synergy"
 import { Weather } from "./Weather"
@@ -192,6 +192,7 @@ export enum Item {
   CASTELIACONE = "CASTELIACONE",
   WHIPPED_DREAM = "WHIPPED_DREAM",
   BERRY_JUICE = "BERRY_JUICE",
+  NANAB_BERRY = "NANAB_BERRY",
   OLIVE_OIL = "OLIVE_OIL",
   TART_APPLE = "TART_APPLE",
   SWEET_APPLE = "SWEET_APPLE",
@@ -203,13 +204,13 @@ export enum Item {
   HERBA_MYSTICA_BITTER = "HERBA_MYSTICA_BITTER",
   HERBA_MYSTICA_SALTY = "HERBA_MYSTICA_SALTY",
   MOOMOO_MILK = "MOOMOO_MILK",
-  BERRIES = "BERRIES",
   HONEY = "HONEY",
   MUSHROOMS = "MUSHROOMS",
   TINY_MUSHROOM = "TINY_MUSHROOM",
   BIG_MUSHROOM = "BIG_MUSHROOM",
   BALM_MUSHROOM = "BALM_MUSHROOM",
   RICE = "RICE",
+  BERRIES = "BERRIES",
   POFFIN = "POFFIN",
   ROCK_SALT = "ROCK_SALT",
   NUTRITIOUS_EGG = "NUTRITIOUS_EGG",
@@ -284,6 +285,7 @@ export enum Item {
   MONSTER_MEMORY = "MONSTER_MEMORY",
   AQUATIC_MEMORY = "AQUATIC_MEMORY",
   DRAGON_MEMORY = "DRAGON_MEMORY",
+  FLORA_MEMORY = "FLORA_MEMORY",
   MISSION_ORDER_PINK = "MISSION_ORDER_PINK",
   MISSION_ORDER_RED = "MISSION_ORDER_RED",
   MISSION_ORDER_BLUE = "MISSION_ORDER_BLUE",
@@ -305,7 +307,30 @@ export enum Item {
   NULLIFY_BANDANNA = "NULLIFY_BANDANNA",
   TATSUGIRI_CURLY = "TATSUGIRI_CURLY",
   TATSUGIRI_DROOPY = "TATSUGIRI_DROOPY",
-  TATSUGIRI_STRETCHY = "TATSUGIRI_STRETCHY"
+  TATSUGIRI_STRETCHY = "TATSUGIRI_STRETCHY",
+  CONFUSE_WAND = "CONFUSE_WAND",
+  PETRIFY_WAND = "PETRIFY_WAND",
+  SLOW_WAND = "SLOW_WAND",
+  SLUMBER_WAND = "SLUMBER_WAND",
+  BLAST_WAND = "BLAST_WAND",
+  HP_SWAP_WAND = "HP_SWAP_WAND",
+  SPIRIT_WAND = "SPIRIT_WAND",
+  LONG_WAND = "LONG_WAND",
+  GUIDING_WAND = "GUIDING_WAND",
+  SURROUND_WAND = "SURROUND_WAND",
+  POUNCE_WAND = "POUNCE_WAND",
+  TWO_EDGED_WAND = "TWO_EDGED_WAND",
+  WARP_WAND = "WARP_WAND",
+  SWITCHER_WAND = "SWITCHER_WAND",
+  WHIRLWIND_WAND = "WHIRLWIND_WAND",
+  TUNNEL_WAND = "TUNNEL_WAND",
+  AQUA_MONICA = "AQUA_MONICA",
+  FIERY_DRUM = "FIERY_DRUM",
+  GRASS_CORNET = "GRASS_CORNET",
+  ICY_FLUTE = "ICY_FLUTE",
+  ROCK_HORN = "ROCK_HORN",
+  SKY_MELODICA = "SKY_MELODICA",
+  TERRA_CYMBAL = "TERRA_CYMBAL"
 }
 
 export const MemoryDiscs = [
@@ -333,7 +358,8 @@ export const MemoryDiscs = [
   Item.GOURMET_MEMORY,
   Item.MONSTER_MEMORY,
   Item.AQUATIC_MEMORY,
-  Item.DRAGON_MEMORY
+  Item.DRAGON_MEMORY,
+  Item.FLORA_MEMORY
 ] satisfies Item[]
 
 export const MemoryDiscsBySynergy: {
@@ -363,7 +389,8 @@ export const MemoryDiscsBySynergy: {
   [Synergy.GOURMET]: Item.GOURMET_MEMORY,
   [Synergy.MONSTER]: Item.MONSTER_MEMORY,
   [Synergy.AQUATIC]: Item.AQUATIC_MEMORY,
-  [Synergy.DRAGON]: Item.DRAGON_MEMORY
+  [Synergy.DRAGON]: Item.DRAGON_MEMORY,
+  [Synergy.FLORA]: Item.FLORA_MEMORY
 }
 
 export const MissionOrders = [
@@ -382,6 +409,16 @@ export const DojoTickets = [
   Item.GOLD_DOJO_TICKET
 ] satisfies Item[]
 
+export const SevenTreasures = [
+  Item.AQUA_MONICA,
+  Item.FIERY_DRUM,
+  Item.GRASS_CORNET,
+  Item.ICY_FLUTE,
+  Item.ROCK_HORN,
+  Item.SKY_MELODICA,
+  Item.TERRA_CYMBAL
+] satisfies Item[]
+
 export const TownItems = [
   Item.TREASURE_BOX,
   Item.AMULET_COIN,
@@ -390,6 +427,7 @@ export const TownItems = [
   Item.RECYCLE_TICKET,
   ...DojoTickets,
   ...MissionOrders,
+  ...SevenTreasures,
   Item.EGG_FOR_SELL,
   Item.PICNIC_SET,
   Item.WANTED_NOTICE,
@@ -560,6 +598,7 @@ export const NonSpecialBerries: Item[] = [
 ]
 
 export const SpecialBerries: Item[] = [
+  Item.NANAB_BERRY,
   Item.GOLDEN_RAZZ_BERRY,
   Item.GOLDEN_NANAB_BERRY,
   Item.GOLDEN_PINAP_BERRY
@@ -722,7 +761,10 @@ export const SynergyGemsBuried: SynergyGem[] = [
   Item.STEEL_GEM,
   Item.DRAGON_GEM,
   Item.POISON_GEM,
-  Item.GHOST_GEM
+  Item.GHOST_GEM,
+  Item.FIELD_GEM,
+  Item.GROUND_GEM,
+  Item.AMORPHOUS_GEM
 ] satisfies SynergyGem[]
 
 export const ToolsBuried: Tool[] = [
@@ -830,7 +872,8 @@ export const SynergyGivenByItem = {
   [Item.GOURMET_MEMORY]: Synergy.GOURMET,
   [Item.MONSTER_MEMORY]: Synergy.MONSTER,
   [Item.AQUATIC_MEMORY]: Synergy.AQUATIC,
-  [Item.DRAGON_MEMORY]: Synergy.DRAGON
+  [Item.DRAGON_MEMORY]: Synergy.DRAGON,
+  [Item.FLORA_MEMORY]: Synergy.FLORA
 } satisfies Record<(typeof SynergyItems)[number], Synergy>
 
 export const SynergyGivenByGem: Record<(typeof SynergyGems)[number], Synergy> =
@@ -871,6 +914,25 @@ export const CraftableNoStonesOrScarves: Item[] =
   CraftableItemsNoScarves.filter(
     (item) => SynergyGivenByItem.hasOwnProperty(item) === false
   )
+
+export const Wands: Item[] = [
+  Item.BLAST_WAND,
+  Item.HP_SWAP_WAND,
+  Item.SPIRIT_WAND,
+  Item.LONG_WAND,
+  Item.CONFUSE_WAND,
+  Item.PETRIFY_WAND,
+  Item.SLOW_WAND,
+  Item.SLUMBER_WAND,
+  Item.GUIDING_WAND,
+  Item.SURROUND_WAND,
+  Item.POUNCE_WAND,
+  Item.TWO_EDGED_WAND,
+  Item.WARP_WAND,
+  Item.SWITCHER_WAND,
+  Item.WHIRLWIND_WAND,
+  Item.TUNNEL_WAND
+]
 
 export const OgerponMasks: Item[] = [
   Item.TEAL_MASK,
@@ -917,6 +979,10 @@ export const AbilityPerTM: { [item in Item]?: Ability } = {
   [Item.TM_SKILL_SWAP]: Ability.SKILL_SWAP
 }
 
+export const TMPerAbility = reverseMap(
+  objToMap(AbilityPerTM as Record<Item, Ability>)
+)
+
 export const Dishes = [
   Item.OLIVE_OIL,
   Item.RAGE_CANDY_BAR,
@@ -946,7 +1012,6 @@ export const Dishes = [
   Item.SMOKED_FILET,
   Item.SPINDA_COCKTAIL,
   Item.BERRY_JUICE,
-  Item.BERRIES,
   Item.BINDING_MOCHI,
   Item.STRAWBERRY_SWEET,
   Item.LOVE_SWEET,
@@ -962,7 +1027,8 @@ export const Dishes = [
   Item.TINY_MUSHROOM,
   Item.BIG_MUSHROOM,
   Item.BALM_MUSHROOM,
-  Item.RICE
+  Item.RICE,
+  Item.BERRIES
 ] satisfies Item[]
 
 export type Dish = (typeof Dishes)[number]
@@ -980,7 +1046,7 @@ export const DishesGoingToInventory = [
   Item.TINY_MUSHROOM,
   Item.BIG_MUSHROOM,
   Item.BALM_MUSHROOM,
-  ...Berries
+  Item.NANAB_BERRY
 ] satisfies (Dish | Berry)[]
 
 export const ItemsSoldAtTown = [...Mushrooms] satisfies Item[]
@@ -1058,12 +1124,14 @@ export const Mulches = [Item.RICH_MULCH, Item.AMAZE_MULCH] satisfies Item[]
 export const UnholdableItems = [
   ...WeatherRocks,
   ...FishingRods,
+  ...Wands,
   ...TMs,
   ...Flavors,
   ...Dishes,
   ...SynergyGems,
   ...Mulches,
   ...MissionOrders,
+  ...SevenTreasures,
   Item.METEORITE,
   Item.ROTOM_CATALOG,
   Item.MYSTERY_BOX,

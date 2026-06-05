@@ -17,6 +17,11 @@ import { initializeMetrics } from "./metrics"
 import { initCronJobs } from "./services/cronjobs"
 import { fetchLeaderboards } from "./services/leaderboard"
 import { fetchMetaReports } from "./services/meta"
+import {
+  refreshSpriteGapData,
+  warmupSpriteGapScanner
+} from "./services/sprite-gap-scanner"
+import { refreshTwitchBlacklist, refreshTwitchStreams } from "./services/twitch"
 
 /*
 Changed buffer size to 512kb to avoid warnings from colyseus. We need to scale down the amount of data we're sending so it gets sent in multiple packets or increase the buffer size even more.
@@ -35,11 +40,13 @@ async function main() {
       await matchMaker.createRoom("lobby", {})
       checkLobby()
       initCronJobs()
+      void warmupSpriteGapScanner()
     }
   } else {
     await listen(app, process.env.PORT ? parseInt(process.env.PORT) : 9000)
     await matchMaker.createRoom("lobby", {})
     initCronJobs()
+    void warmupSpriteGapScanner()
   }
 
   logger.info("Fetching leaderboards...")
@@ -47,7 +54,13 @@ async function main() {
   setInterval(() => fetchLeaderboards(), 1000 * 60 * 10) // refresh every 10 minutes
   logger.info("Fetching meta reports...")
   fetchMetaReports()
-  setInterval(() => fetchMetaReports(), 1000 * 60 * 60 * 24) // refresh every 24 hours
+  logger.info("Refreshing sprite gap scanner...")
+  setInterval(() => refreshSpriteGapData(), 1000 * 60 * 60 * 24) // refresh every 24 hours
+  logger.info("Fetching Twitch streams...")
+  refreshTwitchBlacklist()
+  setInterval(() => refreshTwitchBlacklist(), 1000 * 60)
+  refreshTwitchStreams()
+  setInterval(() => refreshTwitchStreams(), 1000 * 60 * 5) // refresh every 5 minutes
 }
 
 function checkLobby() {

@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react"
+import type React from "react"
+import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { AutoSizer } from "react-virtualized-auto-sizer"
 import { List, useDynamicRowHeight } from "react-window"
@@ -7,7 +8,7 @@ import { getPokemonData } from "../../../../../models/precomputed/precomputed-po
 import { Ability } from "../../../../../types/enum/Ability"
 import {
   AbilityPerTM,
-  Item,
+  type Item,
   TMsBronze,
   TMsSilver
 } from "../../../../../types/enum/Item"
@@ -15,7 +16,7 @@ import { PkmFamily, PkmIndex } from "../../../../../types/enum/Pokemon"
 import { getPortraitSrc } from "../../../../../utils/avatar"
 import { ItemDetailTooltip } from "../../../game/components/item-detail"
 import { addIconsToDescription } from "../../utils/descriptions"
-import { cc } from "../../utils/jsx"
+import jsxTextContent, { cc } from "../../utils/jsx"
 import { GamePokemonDetailTooltip } from "../game/game-pokemon-detail"
 
 const MIN_COL_WIDTH = 320
@@ -67,7 +68,11 @@ export default function WikiAbility() {
       (a) =>
         a !== Ability.DEFAULT &&
         (!searchQuery.trim() ||
-          `${t(`ability.${a}`)} ${t(`ability_description.${a}`)}`
+          jsxTextContent(
+            addIconsToDescription(
+              `${t(`ability.${a}`)} ${t(`ability_description.${a}`)}`
+            )
+          )
             .toLowerCase()
             .includes(searchQuery.trim().toLowerCase()))
     )
@@ -107,8 +112,7 @@ export default function WikiAbility() {
                   abilities: filteredAbilities,
                   columnCount,
                   pokemonsPerAbility,
-                  tmPerAbility,
-                  t
+                  tmPerAbility
                 }}
               />
             )
@@ -126,7 +130,6 @@ type AbilityRowData = {
   columnCount: number
   pokemonsPerAbility: Record<string, any[]>
   tmPerAbility: Partial<Record<Ability, Item>>
-  t: (key: string) => string
 }
 
 function AbilityRow({
@@ -135,8 +138,7 @@ function AbilityRow({
   abilities,
   columnCount,
   pokemonsPerAbility,
-  tmPerAbility,
-  t
+  tmPerAbility
 }: {
   ariaAttributes: object
   index: number
@@ -144,6 +146,7 @@ function AbilityRow({
 } & AbilityRowData): React.ReactElement | null {
   const startIdx = index * columnCount
   const rowAbilities = abilities.slice(startIdx, startIdx + columnCount)
+  const { t } = useTranslation()
 
   return (
     <div style={{ ...style, paddingBottom: "0.5em" }}>

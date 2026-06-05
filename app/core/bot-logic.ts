@@ -3,14 +3,13 @@ import {
   computeSynergies,
   getSynergyStep
 } from "../models/colyseus-models/synergies"
-import { IBot, IDetailledPokemon, IStep } from "../models/mongo-models/bot-v2"
 import PokemonFactory from "../models/pokemon-factory"
 import { getPokemonData } from "../models/precomputed/precomputed-pokemon-data"
 import { Rarity } from "../types/enum/Game"
 import {
   CraftableItems,
   Item,
-  ItemComponents,
+  ItemComponentsNoScarf,
   Scarves,
   Tools
 } from "../types/enum/Item"
@@ -23,6 +22,7 @@ import {
   PkmIndex
 } from "../types/enum/Pokemon"
 import { Synergy } from "../types/enum/Synergy"
+import type { IBot, IDetailledPokemon, IStep } from "../types/models/bot-v2"
 import { isIn } from "../utils/array"
 import { logger } from "../utils/logger"
 import { clamp, min } from "../utils/number"
@@ -172,7 +172,7 @@ export function getNbComponentsOnBoard(board: IDetailledPokemon[]): number {
       if (Scarves.includes(item))
         nbComponents = item === Item.NULLIFY_BANDANNA ? 0 : 1
       else if (CraftableItems.includes(item)) nbComponents = 2
-      else if (ItemComponents.includes(item)) nbComponents = 1
+      else if (ItemComponentsNoScarf.includes(item)) nbComponents = 1
       return total + nbComponents
     }, 0)
 }

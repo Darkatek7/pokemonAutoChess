@@ -1,17 +1,17 @@
 import { t } from "i18next"
-import { GameObjects } from "phaser"
+import Phaser, { GameObjects } from "phaser"
 import {
   GOLDEN_BERRY_TREE_TYPES,
   getRegionTint,
   SynergyTriggers
 } from "../../../../config"
-import Player from "../../../../models/colyseus-models/player"
+import type Player from "../../../../models/colyseus-models/player"
 import { Transfer } from "../../../../types"
 import { Synergy } from "../../../../types/enum/Synergy"
 import { preference } from "../../preferences"
 import { DEPTH } from "../depths"
 import type GameScene from "../scenes/game-scene"
-import BoardManager from "./board-manager"
+import type BoardManager from "./board-manager"
 import ItemDetail from "./item-detail"
 
 export class BerryTree extends GameObjects.Container {

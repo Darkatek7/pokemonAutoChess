@@ -18,6 +18,16 @@ The official server maintained by the creators of Pokemon Auto Chess
 
 German Community for Pokemon Auto Chess
 
+# John Auto Chess
+
+- url: https://www.john-auto-chess.com/
+- logo: /assets/community-servers/john-auto-chess.png
+- creator: tegberen
+- discord: https://discord.gg/rujUfyB6aq
+- location: Germany
+
+It runs the official version as base with some light changes on the meta. Near the end of each patch, it switches to pre-release mode for playtesting.
+
 # China PAC
 
 - url: https://pokev9.52kx.net
@@ -26,6 +36,16 @@ German Community for Pokemon Auto Chess
 - location: china
 
 China Community Server for Pokemon Auto Chess
+
+# Pokemon Auto Spire
+
+- url: https://pokemon-auto-spire.com/
+- logo: /assets/community-servers/AutoSpire.png
+- creator: Fish
+- discord: https://discord.gg/cfytB2kA
+- location: Australia
+
+Pokemon Auto Spire is a Slay the Spire inspired mod of PAC - its a single player game!
 
 # Eternara PAC
 
@@ -83,3 +103,4 @@ UW POC es un servidor apuntado para la comunidad latina de PokemonAutoChess, el 
 - location: Australia
 
 Australian Community Server for Pokemon Auto Chess
+

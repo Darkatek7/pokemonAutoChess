@@ -1,25 +1,29 @@
 import { t } from "i18next"
-import React, { useEffect, useMemo, useState } from "react"
+import type React from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Tab, TabList, TabPanel, Tabs } from "react-tabs"
 import { AutoSizer } from "react-virtualized-auto-sizer"
 import { List, useDynamicRowHeight } from "react-window"
 import { EloRankThreshold } from "../../../../../config"
-import {
-  fetchMetaItems,
-  IItemsStatisticV2,
-  IItemV2
-} from "../../../../../models/mongo-models/items-statistic-v2"
 import { EloRank } from "../../../../../types/enum/EloRank"
 import {
   CraftableItems,
-  Item,
+  type Item,
   ShinyItems,
-  Tools
+  Tools,
+  UnholdableItems
 } from "../../../../../types/enum/Item"
+import {
+  fetchMetaItems,
+  type IItemsStatisticV2,
+  type IItemV2
+} from "../../../models/items-statistic-v2"
 import { ItemDistribution } from "./item-distribution"
 import { ItemHistoryPanel } from "./item-history-panel"
 import ItemStatistic from "./item-statistic"
 import "./item-report.css"
+import { keys } from "../../../../../utils/object"
+import { cc } from "../../utils/jsx"
 
 type ViewMode = "distribution" | "count-history" | "rank-history"
 
@@ -50,7 +54,11 @@ export function ItemReport() {
   const tabs: { label: string; key: string; items?: readonly Item[] }[] = [
     { label: t("craftable_items"), key: "craftable", items: CraftableItems },
     { label: t("tools"), key: "tools", items: Tools },
-    { label: t("shiny_items"), key: "shiny_items", items: ShinyItems }
+    {
+      label: t("shiny_items"),
+      key: "shiny_items",
+      items: ShinyItems.filter((i) => !UnholdableItems.includes(i))
+    }
   ]
 
   return (
@@ -74,7 +82,7 @@ export function ItemReport() {
           value={eloThreshold}
           onChange={(e) => setEloTreshold(e.target.value as EloRank)}
         >
-          {Object.keys(EloRank).map((r) => (
+          {keys(EloRank).map((r) => (
             <option value={r} key={r}>
               {t(`elorank.${r}`)} ({t("elo")} {">"} {EloRankThreshold[r]})
             </option>
@@ -107,7 +115,9 @@ export function ItemReport() {
             <div className="item-distribution-chart">
               <div className="view-switcher">
                 <button
-                  className={viewMode === "distribution" ? "active" : ""}
+                  className={cc("bubbly", {
+                    active: viewMode === "distribution"
+                  })}
                   onClick={() => setViewMode("distribution")}
                 >
                   {t("overview")}
@@ -116,7 +126,9 @@ export function ItemReport() {
                   </span>
                 </button>
                 <button
-                  className={viewMode === "count-history" ? "active" : ""}
+                  className={cc("bubbly", {
+                    active: viewMode === "count-history"
+                  })}
                   onClick={() => setViewMode("count-history")}
                 >
                   {t("popularity_over_time")}
@@ -125,7 +137,9 @@ export function ItemReport() {
                   </span>
                 </button>
                 <button
-                  className={viewMode === "rank-history" ? "active" : ""}
+                  className={cc("bubbly", {
+                    active: viewMode === "rank-history"
+                  })}
                   onClick={() => setViewMode("rank-history")}
                 >
                   {t("placement_over_time")}

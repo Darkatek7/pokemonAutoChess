@@ -2,12 +2,13 @@ import { matchMaker } from "colyseus"
 import { CronJob } from "cron"
 import dayjs from "dayjs"
 import admin from "firebase-admin"
-import { UserRecord } from "firebase-admin/lib/auth/user-record"
+import type { UserRecord } from "firebase-admin/lib/auth/user-record"
 import {
   CRON_ELO_DECAY_DELAY,
   CRON_ELO_DECAY_MINIMUM_ELO,
   CRON_HISTORY_CLEANUP_DELAY,
   ELO_DECAY_LOST_PER_DAY,
+  ELO_DECAY_NB_GAMES_REQUIRED,
   EloRankThreshold,
   getCurrentGameEvent
 } from "../config"
@@ -20,7 +21,9 @@ import { GameMode } from "../types/enum/Game"
 import { GameEvent } from "../types/events"
 import { logger } from "../utils/logger"
 import { min } from "../utils/number"
+import { fetchMetaReports } from "./meta"
 import { notificationsService } from "./notifications"
+import { refreshSpriteGapData } from "./sprite-gap-scanner"
 
 export function initCronJobs() {
   logger.debug("init cron jobs")
@@ -59,6 +62,23 @@ export function initCronJobs() {
     cronTime: "0 0 1 * *", // at midnight UTC on the first day of each month
     timeZone: "UTC",
     onTick: () => resetEventScores(),
+    start: true
+  })
+  CronJob.from({
+    cronTime: "0 9 * * *", // every day at 9:00 AM UTC
+    timeZone: "UTC",
+    onTick: () => refreshSpriteGapData(),
+    start: true
+  })
+
+  // see https://github.com/keldaanCommunity/pokemonAutoChessMetaReport/blob/main/.github/workflows/main.yml
+  // Meta report generation task is launched at 1:00 AM UTC, so we expect meta report generation to be done by then (< 1 hour)
+  CronJob.from({
+    cronTime: "0 2 * * *", // every day at 2:00 AM UTC
+    timeZone: "UTC",
+    onTick: () => {
+      fetchMetaReports()
+    },
     start: true
   })
 }
@@ -135,7 +155,8 @@ async function eloDecay() {
       )
 
       const shouldDecay =
-        stats.length < 3 || Date.now() - stats[2].time > CRON_ELO_DECAY_DELAY
+        stats.length < ELO_DECAY_NB_GAMES_REQUIRED ||
+        Date.now() - stats[2].time > CRON_ELO_DECAY_DELAY
 
       if (shouldDecay) {
         const eloAfterDecay = min(CRON_ELO_DECAY_MINIMUM_ELO)(
