@@ -1,48 +1,53 @@
-import { SchemaCallbackProxy } from "@colyseus/schema"
-import { getStateCallbacks, Room } from "@colyseus/sdk"
+import type { SchemaCallbackProxy } from "@colyseus/schema"
+import { getStateCallbacks, type Room } from "@colyseus/sdk"
 import { t } from "i18next"
 import Phaser from "phaser"
-import MoveToPlugin from "phaser3-rex-plugins/plugins/moveto-plugin.js"
-import OutlinePlugin from "phaser3-rex-plugins/plugins/outlinepipeline-plugin.js"
+import MoveToPlugin from "phaser4-rex-plugins/plugins/moveto-plugin"
+import OutlinePlugin from "phaser4-rex-plugins/plugins/outlinefilter-plugin"
 import React from "react"
 import { toast } from "react-toastify"
 import { ItemStats } from "../../../config"
 import { FLOWER_POTS_POSITIONS_BLUE } from "../../../core/flower-pots"
-import { PokemonEntity } from "../../../core/pokemon-entity"
-import Simulation from "../../../core/simulation"
-import Count from "../../../models/colyseus-models/count"
-import { FloatingItem } from "../../../models/colyseus-models/floating-item"
-import Player from "../../../models/colyseus-models/player"
-import { Pokemon } from "../../../models/colyseus-models/pokemon"
-import { PokemonAvatarModel } from "../../../models/colyseus-models/pokemon-avatar"
-import { Portal, SynergySymbol } from "../../../models/colyseus-models/portal"
-import Status from "../../../models/colyseus-models/status"
-import GameState from "../../../rooms/states/game-state"
+import type { PokemonEntity } from "../../../core/pokemon-entity"
+import type Simulation from "../../../core/simulation"
+import type Count from "../../../models/colyseus-models/count"
+import type { FloatingItem } from "../../../models/colyseus-models/floating-item"
+import type Player from "../../../models/colyseus-models/player"
+import type { Pokemon } from "../../../models/colyseus-models/pokemon"
+import type { PokemonAvatarModel } from "../../../models/colyseus-models/pokemon-avatar"
+import type {
+  Portal,
+  SynergySymbol
+} from "../../../models/colyseus-models/portal"
+import type Status from "../../../models/colyseus-models/status"
+import type GameState from "../../../rooms/states/game-state"
 import {
-  IDragDropCombineMessage,
-  IDragDropItemMessage,
-  IDragDropMessage,
-  IPlayer,
-  IPokemon,
-  IPokemonEntity,
+  type IDragDropCombineMessage,
+  type IDragDropItemMessage,
+  type IDragDropMessage,
+  type IPlayer,
+  type IPokemon,
+  type IPokemonEntity,
   Transfer
 } from "../../../types"
-import { Ability } from "../../../types/enum/Ability"
+import type { Ability } from "../../../types/enum/Ability"
 import { EffectEnum } from "../../../types/enum/Effect"
 import {
-  AttackType,
+  type AttackType,
   GamePhaseState,
-  HealType,
-  Orientation,
+  type HealType,
+  type Orientation,
   PokemonActionState,
   Rarity,
   Stat
 } from "../../../types/enum/Game"
+import { Synergy } from "../../../types/enum/Synergy"
 import { Weather } from "../../../types/enum/Weather"
 import type { NonFunctionPropNames } from "../../../types/HelperTypes"
+import type { DisplayText } from "../../../types/strings/DisplayText"
 import { logger } from "../../../utils/logger"
 import { clamp, max } from "../../../utils/number"
-import { values } from "../../../utils/schemas"
+import { schemaValues } from "../../../utils/schemas"
 import { getCachedPortrait } from "../pages/component/game/game-pokemon-portrait"
 import { playSound, SOUNDS } from "../pages/utils/audio"
 import { transformBoardCoordinates } from "../pages/utils/utils"
@@ -278,6 +283,7 @@ class GameContainer {
 
   initializeGame() {
     if (this.game != null) return // prevent initializing twice
+
     // Create Phaser game
     const renderer = Number(preference("renderer") ?? Phaser.AUTO)
     const config = {
@@ -508,7 +514,7 @@ class GameContainer {
           this.gameScene?.board?.updatePokemonDishes(
             player.id,
             pokemon,
-            values(pokemon.dishes)
+            schemaValues(pokemon.dishes)
           )
         }
       })
@@ -554,24 +560,16 @@ class GameContainer {
       }
     })
 
-    $player.scarvesItems.onChange((value, key) => {
-      store.dispatch(
-        changePlayer({
-          id: player.id,
-          field: "scarvesItems",
-          value: player.scarvesItems
-        })
-      )
-    })
-
-    $player.synergies.onChange(() => {
+    $player.synergies.onChange((level, synergy) => {
       if (
         player.id === this.playerIdSpectated &&
         this.gameScene?.board?.mode === BoardMode.PICK
       ) {
-        this.gameScene?.board?.showLightCell()
-        this.gameScene?.board?.renderBerryTrees()
-        this.gameScene?.board?.renderFlowerPots()
+        if (synergy === Synergy.LIGHT) this.gameScene?.board?.showLightCell()
+        if (synergy === Synergy.GRASS) this.gameScene?.board?.renderBerryTrees()
+        if (synergy === Synergy.FLORA) this.gameScene?.board?.renderFlowerPots()
+        if (synergy === Synergy.FIGHTING)
+          this.gameScene?.board?.renderTrainingBag()
       }
     })
 
@@ -726,6 +724,8 @@ class GameContainer {
       if (!pokemonUI) return
       if (pokemon.action === PokemonActionState.FISH) {
         pokemonUI.fishingAnimation()
+      } else if (pokemon.action === PokemonActionState.NEST) {
+        pokemonUI.nestAnimation(false)
       } else if (pokemon.stars > 1) {
         pokemonUI.evolutionAnimation()
         playSound(
@@ -742,7 +742,7 @@ class GameContainer {
   handleDragDropCancel(message: {
     updateBoard: boolean
     updateItems: boolean
-    text?: string
+    text?: DisplayText
     pokemonId?: string
   }) {
     const gameScene = this.gameScene

@@ -2,17 +2,22 @@ import { Schema, type } from "@colyseus/schema"
 import { CC_COOLDOWN, FIGHTING_PHASE_DURATION, ItemStats } from "../../config"
 import type { Board } from "../../core/board"
 import { transformToIceFace } from "../../core/effects/passives"
-import { PokemonEntity } from "../../core/pokemon-entity"
-import { IPokemonEntity, ISimulation, IStatus, Transfer } from "../../types"
+import type { PokemonEntity } from "../../core/pokemon-entity"
+import {
+  type IPokemonEntity,
+  type ISimulation,
+  type IStatus,
+  Transfer
+} from "../../types"
 import { EffectEnum } from "../../types/enum/Effect"
 import { AttackType, Stat, Team } from "../../types/enum/Game"
 import { Item } from "../../types/enum/Item"
 import { Passive } from "../../types/enum/Passive"
-import { Pkm, PkmIndex } from "../../types/enum/Pokemon"
+import { Synergy } from "../../types/enum/Synergy"
 import { Weather } from "../../types/enum/Weather"
 import { count } from "../../utils/array"
 import { max, min } from "../../utils/number"
-import { values } from "../../utils/schemas"
+import { schemaValues } from "../../utils/schemas"
 
 export default class Status extends Schema implements IStatus {
   @type("boolean") burn = false
@@ -164,7 +169,7 @@ export default class Status extends Schema implements IStatus {
   transferNegativeStatus(from: PokemonEntity, to: PokemonEntity) {
     if (this.burn) to.status.triggerBurn(this.burnCooldown, to, from)
     if (this.silence) to.status.triggerSilence(this.silenceCooldown, to, from)
-    if (this.fatigue) to.status.triggerFatigue(this.fatigueCooldown, to)
+    if (this.fatigue) to.status.triggerFatigue(this.fatigueCooldown, to, from)
     if (this.poisonStacks > 0)
       to.status.triggerPoison(this.poisonCooldown, to, from)
     if (this.freeze) to.status.triggerFreeze(this.freezeCooldown, to, from)
@@ -180,7 +185,7 @@ export default class Status extends Schema implements IStatus {
       to.status.triggerArmorReduction(this.armorReductionCooldown, to)
     if (this.curse) to.status.triggerCurse(this.curseCooldown, to)
     if (this.locked) to.status.triggerLocked(this.lockedCooldown, to)
-    if (this.blinded) to.status.triggerBlinded(this.blindCooldown, to)
+    if (this.blinded) to.status.triggerBlinded(this.blindCooldown, to, from)
     if (this.possessed)
       to.status.triggerPossessed(this.possessedCooldown, to, from)
   }
@@ -199,7 +204,7 @@ export default class Status extends Schema implements IStatus {
       !this.blinded &&
       !pokemon.items.has(Item.HEAVY_DUTY_BOOTS)
     ) {
-      this.triggerBlinded(1000, pokemon)
+      this.triggerBlinded(1000, pokemon, null)
     }
 
     if (
@@ -326,7 +331,7 @@ export default class Status extends Schema implements IStatus {
     }
 
     if (pokemon.status.curseTorment && !pokemon.status.fatigue) {
-      this.triggerFatigue(30000, pokemon)
+      this.triggerFatigue(30000, pokemon, null)
     }
 
     if (pokemon.status.curseFate && !pokemon.status.curse) {
@@ -392,7 +397,7 @@ export default class Status extends Schema implements IStatus {
   triggerBurn(
     duration: number,
     pkm: PokemonEntity,
-    origin: PokemonEntity | undefined
+    origin: PokemonEntity | null
   ) {
     const alreadyBurning = this.burn
     if (
@@ -456,7 +461,10 @@ export default class Status extends Schema implements IStatus {
           burnDamage *= 0.7
         } else if (pkm.effects.has(EffectEnum.HYDRATION)) {
           burnDamage *= 0.5
-        } else if (pkm.effects.has(EffectEnum.WATER_VEIL)) {
+        } else if (
+          pkm.effects.has(EffectEnum.WATER_VEIL) ||
+          pkm.effects.has(EffectEnum.SURGE_SURFER)
+        ) {
           burnDamage *= 0.3
         }
 
@@ -538,13 +546,19 @@ export default class Status extends Schema implements IStatus {
     }
   }
 
-  triggerFatigue(duration: number, pkm: PokemonEntity) {
+  triggerFatigue(
+    duration: number,
+    pkm: PokemonEntity,
+    origin: PokemonEntity | null,
+    apBoost = false
+  ) {
     if (!this.runeProtect) {
+      duration = apBoost && origin ? duration * (1 + origin.ap / 100) : duration
       duration = this.applyStatusDurationReductions(duration, pkm)
 
       this.fatigue = true
       if (duration > this.fatigueCooldown) {
-        this.fatigueCooldown = duration
+        this.fatigueCooldown = Math.round(duration)
       }
     }
   }
@@ -625,7 +639,10 @@ export default class Status extends Schema implements IStatus {
         poisonDamage *= 0.7
       } else if (pkm.effects.has(EffectEnum.HYDRATION)) {
         poisonDamage *= 0.5
-      } else if (pkm.effects.has(EffectEnum.WATER_VEIL)) {
+      } else if (
+        pkm.effects.has(EffectEnum.WATER_VEIL) ||
+        pkm.effects.has(EffectEnum.SURGE_SURFER)
+      ) {
         poisonDamage *= 0.3
       }
       poisonDamage = Math.round(poisonDamage)
@@ -768,6 +785,12 @@ export default class Status extends Schema implements IStatus {
   }
 
   updateSleep(dt: number, pkm: PokemonEntity) {
+    if (pkm.passive === Passive.COMATOSE) {
+      this.sleep = true
+      this.sleepCooldown = 1000
+      return
+    }
+
     if (this.sleepCooldown - dt <= 0) {
       this.sleep = false
       this.ccCooldown = Math.max(this.ccCooldown, CC_COOLDOWN)
@@ -790,8 +813,7 @@ export default class Status extends Schema implements IStatus {
       !this.runeProtect &&
       !pkm.effects.has(EffectEnum.IMMUNITY_CONFUSION)
     ) {
-      const boost = apBoost && origin ? (duration * origin.ap) / 100 : 0
-      duration = duration + boost
+      duration = apBoost && origin ? duration * (1 + origin.ap / 100) : duration
       if (pkm.simulation.weather === Weather.SANDSTORM) {
         duration *= 1.3
       }
@@ -827,8 +849,7 @@ export default class Status extends Schema implements IStatus {
     apBoost = false
   ) {
     if (!this.charm && !this.runeProtect) {
-      const boost = apBoost && origin ? (duration * origin.ap) / 100 : 0
-      duration = duration + boost
+      duration = apBoost && origin ? duration * (1 + origin.ap / 100) : duration
       if (pkm.simulation.weather === Weather.MISTY) {
         duration *= 1.3
       }
@@ -893,8 +914,7 @@ export default class Status extends Schema implements IStatus {
       if (!this.paralysis) {
         this.paralysis = true
       }
-      const boost = apBoost && origin ? (duration * origin.ap) / 100 : 0
-      duration = duration + boost
+      duration = apBoost && origin ? duration * (1 + origin.ap / 100) : duration
       if (pkm.simulation.weather === Weather.STORM) {
         duration *= 1.3
         const nbElectricQuartz = pkm.player
@@ -1144,11 +1164,19 @@ export default class Status extends Schema implements IStatus {
   updateLocked(dt: number, pokemon: PokemonEntity) {
     if (this.lockedCooldown - dt <= 0) {
       this.locked = false
-      pokemon.range =
-        pokemon.baseRange +
-        (pokemon.items.has(Item.WIDE_LENS)
-          ? (ItemStats[Item.WIDE_LENS]?.[Stat.RANGE] ?? 0)
-          : 0)
+      let range = pokemon.baseRange
+      if (pokemon.items.has(Item.WIDE_LENS)) {
+        range += ItemStats[Item.WIDE_LENS]?.[Stat.RANGE] ?? 0
+      }
+      if (
+        pokemon.player &&
+        pokemon.player.items.includes(Item.LONG_WAND) &&
+        pokemon.types.has(Synergy.FAIRY)
+      ) {
+        range += 1
+      }
+      pokemon.range = range
+
       this.ccCooldown = Math.max(this.ccCooldown, CC_COOLDOWN)
     } else {
       this.lockedCooldown -= dt
@@ -1165,7 +1193,11 @@ export default class Status extends Schema implements IStatus {
         pkm.team === Team.RED_TEAM
           ? pkm.simulation.redTeam
           : pkm.simulation.blueTeam
-      if (values(pkmTeam).some((p) => p.id !== pkm.id && !p.status.possessed)) {
+      if (
+        schemaValues(pkmTeam).some(
+          (p) => p.id !== pkm.id && !p.status.possessed
+        )
+      ) {
         if (!this.possessed) {
           pkm.team =
             pkm.team === Team.BLUE_TEAM ? Team.RED_TEAM : Team.BLUE_TEAM
@@ -1190,7 +1222,7 @@ export default class Status extends Schema implements IStatus {
       pkm.team === Team.RED_TEAM
         ? pkm.simulation.blueTeam
         : pkm.simulation.redTeam
-    const possessedCount = values(otherTeam).filter(
+    const possessedCount = schemaValues(otherTeam).filter(
       (pokemon) => pokemon.status.possessed
     ).length
     const lastAliveArePossessed = possessedCount === otherTeam.size
@@ -1218,8 +1250,15 @@ export default class Status extends Schema implements IStatus {
     }
   }
 
-  triggerBlinded(duration: number, pkm: PokemonEntity) {
+  triggerBlinded(
+    duration: number,
+    pkm: PokemonEntity,
+    origin: PokemonEntity | null,
+    apBoost = false
+  ) {
     if (!this.blinded && !this.runeProtect) {
+      duration = apBoost && origin ? duration * (1 + origin.ap / 100) : duration
+
       if (pkm.status.enraged) {
         duration = duration / 2
       }

@@ -1,8 +1,7 @@
-import React from "react"
 import { CircularProgressbarWithChildren } from "react-circular-progressbar"
 import { Tooltip } from "react-tooltip"
 
-import { IPlayer } from "../../../../../types"
+import type { IPlayer } from "../../../../../types"
 import { getAvatarSrc } from "../../../../../utils/avatar"
 import { DEPTH } from "../../../game/depths"
 import { useAppSelector } from "../../../hooks"
@@ -23,7 +22,9 @@ export default function GamePlayer(props: {
   const connectedPlayerId = useAppSelector((state) => state.network.uid)
 
   function playerClick() {
-    props.click(props.player.id)
+    if (spectatedPlayerId !== props.player.id) {
+      props.click(props.player.id)
+    }
   }
 
   return (

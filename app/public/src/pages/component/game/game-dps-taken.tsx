@@ -1,6 +1,5 @@
-import React from "react"
 import { useTranslation } from "react-i18next"
-import { IDps } from "../../../../../types"
+import type { IDps } from "../../../../../types"
 import { usePreference } from "../../../preferences"
 import PokemonPortrait from "../pokemon-portrait"
 import ProgressBar from "../progress-bar/progress-bar"
