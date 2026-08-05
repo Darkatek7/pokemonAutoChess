@@ -548,7 +548,7 @@ const MilceryFlavorEffect = new OnStageStartEffect(({ player, pokemon }) => {
         milcery.positionY,
         p.positionX,
         p.positionY
-      ) <= 1
+      ) == 1
   )
   adjacentAllies.forEach((ally) => {
     ally.types.forEach((synergy) => {
@@ -958,13 +958,16 @@ const spawnPhioneFromAquaEggOnSimulationStartEffect =
   }, Passive.MANAPHY)
 
 const stonjournerPowerSpotOnSimulationStartEffect = new OnSimulationStartEffect(
-  ({ entity, simulation }) => {
+  ({ entity, simulation, player }) => {
     simulation.board
       .getAdjacentCells(entity.positionX, entity.positionY)
       .forEach((cell) => {
         if (cell.value && cell.value.team === entity.team) {
           cell.value.addAbilityPower(
-            entity.inSpotlight ? 100 : 50,
+            entity.inSpotlight &&
+              player?.synergies.hasSynergyActive(Synergy.LIGHT)
+              ? 100
+              : 50,
             cell.value,
             0,
             false

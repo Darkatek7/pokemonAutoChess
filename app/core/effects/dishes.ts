@@ -1,104 +1,33 @@
-import { FIGHTING_PHASE_DURATION, getBaseAltForm } from "../config"
-import { Title } from "../types"
-import { EffectEnum } from "../types/enum/Effect"
-import { Berries, type Dishes, Item } from "../types/enum/Item"
-import { Pkm } from "../types/enum/Pokemon"
-import { Synergy } from "../types/enum/Synergy"
-import { chance } from "../utils/random"
-import { schemaValues } from "../utils/schemas"
-import { AbilityStrategies } from "./abilities/abilities"
+import { FIGHTING_PHASE_DURATION, getBaseAltForm } from "../../config"
+import { Title } from "../../types"
+import { EffectEnum } from "../../types/enum/Effect"
+import { Berries, type Dishes, Item } from "../../types/enum/Item"
+import { Pkm } from "../../types/enum/Pokemon"
+import { Synergy } from "../../types/enum/Synergy"
+import { chance } from "../../utils/random"
+import { schemaValues } from "../../utils/schemas"
+import { AbilityStrategies } from "./../abilities/abilities"
 import {
   type Effect,
   OnDishConsumedEffect,
   OnHitEffect,
   OnSpawnEffect,
   PeriodicEffect
-} from "./effects/effect"
-
-export const DishByPkm: { [pkm in Pkm]?: Item | null } = {
-  [Pkm.LICKITUNG]: Item.RAGE_CANDY_BAR,
-  [Pkm.LICKILICKY]: Item.RAGE_CANDY_BAR,
-  [Pkm.SINISTEA]: Item.TEA,
-  [Pkm.POLTEAGEIST]: Item.TEA,
-  [Pkm.CAPSAKID]: Item.CURRY,
-  [Pkm.SCOVILLAIN]: Item.CURRY,
-  [Pkm.VANILLITE]: Item.CASTELIACONE,
-  [Pkm.VANILLISH]: Item.CASTELIACONE,
-  [Pkm.VANILLUXE]: Item.CASTELIACONE,
-  [Pkm.SWIRLIX]: Item.WHIPPED_DREAM,
-  [Pkm.SLURPUFF]: Item.WHIPPED_DREAM,
-  [Pkm.APPLIN]: Item.TART_APPLE,
-  [Pkm.FLAPPLE]: Item.TART_APPLE,
-  [Pkm.APPLETUN]: Item.SWEET_APPLE,
-  [Pkm.DIPPLIN]: Item.SIRUPY_APPLE,
-  [Pkm.HYDRAPPLE]: Item.SIRUPY_APPLE,
-  [Pkm.CHERUBI]: Item.HERBA_MYSTICA,
-  [Pkm.CHERRIM]: Item.HERBA_MYSTICA,
-  [Pkm.CHERRIM_SUNLIGHT]: Item.HERBA_MYSTICA,
-  [Pkm.TROPIUS]: Item.NANAB_BERRY,
-  [Pkm.SHUCKLE]: Item.BERRY_JUICE,
-  [Pkm.COMBEE]: Item.HONEY,
-  [Pkm.VESPIQUEN]: Item.HONEY,
-  [Pkm.CHANSEY]: Item.NUTRITIOUS_EGG,
-  [Pkm.BLISSEY]: Item.NUTRITIOUS_EGG,
-  [Pkm.NACLI]: Item.ROCK_SALT,
-  [Pkm.NACLSTACK]: Item.ROCK_SALT,
-  [Pkm.GARGANACL]: Item.ROCK_SALT,
-  [Pkm.FIDOUGH]: Item.POFFIN,
-  [Pkm.DACHSBUN]: Item.POFFIN,
-  [Pkm.MUNCHLAX]: Item.LEFTOVERS,
-  [Pkm.SNORLAX]: Item.LEFTOVERS,
-  [Pkm.MILTANK]: Item.MOOMOO_MILK,
-  [Pkm.GULPIN]: Item.BLACK_SLUDGE,
-  [Pkm.SWALOT]: Item.BLACK_SLUDGE,
-  [Pkm.BOUNSWEET]: Item.FRUIT_JUICE,
-  [Pkm.STEENEE]: Item.FRUIT_JUICE,
-  [Pkm.TSAREENA]: Item.FRUIT_JUICE,
-  [Pkm.FARFETCH_D]: Item.LEEK,
-  [Pkm.GALARIAN_FARFETCH_D]: Item.LARGE_LEEK,
-  [Pkm.SPINDA]: Item.SPINDA_COCKTAIL,
-  [Pkm.MILCERY]: Item.SWEETS,
-  [Pkm.ALCREMIE_VANILLA]: Item.SWEETS,
-  [Pkm.ALCREMIE_RUBY]: Item.SWEETS,
-  [Pkm.ALCREMIE_MATCHA]: Item.SWEETS,
-  [Pkm.ALCREMIE_MINT]: Item.SWEETS,
-  [Pkm.ALCREMIE_LEMON]: Item.SWEETS,
-  [Pkm.ALCREMIE_SALTED]: Item.SWEETS,
-  [Pkm.ALCREMIE_RUBY_SWIRL]: Item.SWEETS,
-  [Pkm.ALCREMIE_CARAMEL_SWIRL]: Item.SWEETS,
-  [Pkm.ALCREMIE_RAINBOW_SWIRL]: Item.SWEETS,
-  [Pkm.PECHARUNT]: Item.BINDING_MOCHI,
-  [Pkm.VELUZA]: Item.SMOKED_FILET,
-  [Pkm.SMOLIV]: Item.OLIVE_OIL,
-  [Pkm.DOLLIV]: Item.OLIVE_OIL,
-  [Pkm.ARBOLIVA]: Item.OLIVE_OIL,
-  [Pkm.DEERLING_SUMMER]: Item.TEA,
-  [Pkm.SAWSBUCK_SUMMER]: Item.TEA,
-  [Pkm.LECHONK]: Item.MUSHROOMS,
-  [Pkm.OINKOLOGNE_MALE]: Item.MUSHROOMS,
-  //[Pkm.OINKOLOGNE_FEMALE]: Item.MUSHROOMS
-  [Pkm.DONDOZO]: Item.RICE,
-  [Pkm.TATSUGIRI_CURLY]: null,
-  [Pkm.TATSUGIRI_DROOPY]: null,
-  [Pkm.TATSUGIRI_STRETCHY]: null,
-  [Pkm.GUZZLORD]: null,
-  [Pkm.SKWOVET]: Item.BERRIES,
-  [Pkm.GREEDENT]: Item.BERRIES
-}
+} from "./../effects/effect"
 
 export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
-  BERRY_JUICE: [
+  [Item.BERRY_JUICE]: [
     new OnSpawnEffect((entity) => {
       entity.addShield(100, entity, 0, false)
       entity.effects.add(EffectEnum.BERRY_JUICE)
     })
   ],
-  BIG_MUSHROOM: [
+  [Item.BIG_MUSHROOM]: [
     new OnSpawnEffect((entity) => {
       entity.addMaxHP(0.3 * entity.baseHP, entity, 0, false)
     })
   ],
-  BALM_MUSHROOM: [
+  [Item.BALM_MUSHROOM]: [
     new OnSpawnEffect((entity) => {
       entity.status.triggerRuneProtect(30000, entity, entity)
       entity.addSpeed(30, entity, 0, false)
@@ -114,8 +43,8 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
       )
     })
   ],
-  BERRIES: [],
-  BINDING_MOCHI: [
+  [Item.BERRIES]: [],
+  [Item.BINDING_MOCHI]: [
     new OnSpawnEffect((entity) => {
       entity.effects.add(EffectEnum.BINDING_MOCHI)
     }),
@@ -126,7 +55,7 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
       }
     })
   ],
-  BLACK_SLUDGE: [
+  [Item.BLACK_SLUDGE]: [
     new OnSpawnEffect((entity) => {
       if (entity.types.has(Synergy.POISON)) {
         entity.effectsSet.add(
@@ -143,7 +72,7 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
       }
     })
   ],
-  CASTELIACONE: [
+  [Item.CASTELIACONE]: [
     new OnSpawnEffect((entity) => {
       entity.effects.add(EffectEnum.CASTELIACONE)
     }),
@@ -154,17 +83,17 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
       }
     })
   ],
-  CURRY: [
+  [Item.CURRY]: [
     new OnSpawnEffect((entity) => {
-      entity.status.triggerRage(4000, entity)
+      entity.status.triggerRage(3000, entity)
     })
   ],
-  FRUIT_JUICE: [
+  [Item.FRUIT_JUICE]: [
     new OnSpawnEffect((entity) => {
       entity.addSpeed(50, entity, 0, false)
     })
   ],
-  HEARTY_STEW: [
+  [Item.HEARTY_STEW]: [
     new OnSpawnEffect((entity) => {
       entity.addMaxHP(0.3 * entity.baseHP, entity, 0, false)
       if (entity.items.has(Item.COOKING_POT)) {
@@ -172,34 +101,34 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
       }
     })
   ],
-  HERBA_MYSTICA: [],
-  HERBA_MYSTICA_SWEET: [
+  [Item.HERBA_MYSTICA]: [],
+  [Item.HERBA_MYSTICA_SWEET]: [
     new OnSpawnEffect((entity) => {
       entity.status.addFairyField(entity)
     })
   ],
-  HERBA_MYSTICA_SPICY: [
+  [Item.HERBA_MYSTICA_SPICY]: [
     new OnSpawnEffect((entity) => {
       entity.status.addPsychicField(entity)
     })
   ],
-  HERBA_MYSTICA_SOUR: [
+  [Item.HERBA_MYSTICA_SOUR]: [
     new OnSpawnEffect((entity) => {
       entity.status.addElectricField(entity)
     })
   ],
-  HERBA_MYSTICA_BITTER: [
+  [Item.HERBA_MYSTICA_BITTER]: [
     new OnSpawnEffect((entity) => {
       entity.status.addGrassField(entity)
     })
   ],
-  HERBA_MYSTICA_SALTY: [
+  [Item.HERBA_MYSTICA_SALTY]: [
     new OnSpawnEffect((entity) => {
       entity.status.triggerRuneProtect(FIGHTING_PHASE_DURATION, entity, entity)
     })
   ],
-  HONEY: [],
-  LARGE_LEEK: [
+  [Item.HONEY]: [],
+  [Item.LARGE_LEEK]: [
     new OnSpawnEffect((entity) => {
       entity.effects.add(EffectEnum.ABILITY_CRIT)
       entity.addCritPower(100, entity, 0, false)
@@ -208,7 +137,7 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
       }
     })
   ],
-  LEEK: [
+  [Item.LEEK]: [
     new OnSpawnEffect((entity) => {
       entity.effects.add(EffectEnum.ABILITY_CRIT)
       entity.addCritChance(50, entity, 0, false)
@@ -217,14 +146,14 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
       }
     })
   ],
-  LEFTOVERS: [],
-  MOOMOO_MILK: [
+  [Item.LEFTOVERS]: [],
+  [Item.MOOMOO_MILK]: [
     new OnDishConsumedEffect(({ entity }) => {
       entity?.addMaxHP(15, entity, 0, false, true)
     })
   ],
-  MUSHROOMS: [],
-  NUTRITIOUS_EGG: [
+  [Item.MUSHROOMS]: [],
+  [Item.NUTRITIOUS_EGG]: [
     new OnSpawnEffect((entity) => {
       // Start the next fight with +50% base ATK, DEF, SPE_DEF and AP
       entity.addAttack(0.5 * entity.baseAtk, entity, 0, false)
@@ -232,12 +161,12 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
       entity.addSpecialDefense(0.5 * entity.baseSpeDef, entity, 0, false)
     })
   ],
-  OLIVE_OIL: [
+  [Item.OLIVE_OIL]: [
     new OnSpawnEffect((entity) => {
       entity.addDodgeChance(0.2, entity, 0, false)
     })
   ],
-  POFFIN: [
+  [Item.POFFIN]: [
     new OnSpawnEffect((entity) => {
       entity.addShield(100, entity, 0, false)
 
@@ -257,18 +186,18 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
         })
     })
   ],
-  RAGE_CANDY_BAR: [
+  [Item.RAGE_CANDY_BAR]: [
     new OnSpawnEffect((entity) => {
       entity.addAttack(10, entity, 0, false)
     })
   ],
-  ROCK_SALT: [
+  [Item.ROCK_SALT]: [
     new OnSpawnEffect((entity) => {
       entity.status.triggerRuneProtect(10000, entity, entity)
       entity.addShield(0.15 * entity.maxHP, entity, 0, false)
     })
   ],
-  SANDWICH: [
+  [Item.SANDWICH]: [
     new OnSpawnEffect((entity) => {
       entity.types.forEach((type) => {
         switch (type) {
@@ -327,16 +256,16 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
       })
     })
   ],
-  SMOKED_FILET: [
+  [Item.SMOKED_FILET]: [
     new OnDishConsumedEffect(({ pokemon, entity, player }) => {
       if (entity) {
         entity.addMaxHP(-5, entity, 0, false, true)
-        entity.addAttack(5, entity, 0, false, true)
+        entity.addAttack(3, entity, 0, false, true)
         entity.addAbilityPower(10, entity, 0, false, true)
       }
     })
   ],
-  SPINDA_COCKTAIL: [
+  [Item.SPINDA_COCKTAIL]: [
     new OnSpawnEffect((entity) => {
       if (chance(0.8, entity)) {
         entity.addAttack(10, entity, 0, false)
@@ -360,35 +289,35 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
       }
     })
   ],
-  SIRUPY_APPLE: [
+  [Item.SIRUPY_APPLE]: [
     new OnHitEffect(({ attacker, target }) => {
       if (chance(0.3, attacker)) {
         target.status.triggerParalysis(3000, target, attacker)
       }
     })
   ],
-  SWEET_APPLE: [
+  [Item.SWEET_APPLE]: [
     new OnHitEffect(({ attacker, target }) => {
       target.addSpecialDefense(-2, attacker, 0, false)
     })
   ],
-  TART_APPLE: [
+  [Item.TART_APPLE]: [
     new OnHitEffect(({ attacker, target }) => {
       target.addDefense(-2, attacker, 0, false)
     })
   ],
-  TEA: [
+  [Item.TEA]: [
     new OnSpawnEffect((entity) => {
-      entity.addPP(80, entity, 0, false)
+      entity.addPP(60, entity, 0, false)
     })
   ],
-  TINY_MUSHROOM: [
+  [Item.TINY_MUSHROOM]: [
     new OnSpawnEffect((entity) => {
       entity.addMaxHP(-0.3 * entity.baseHP, entity, 0, false)
       entity.addSpeed(30, entity, 0, false)
     })
   ],
-  WHIPPED_DREAM: [
+  [Item.WHIPPED_DREAM]: [
     new OnSpawnEffect((entity) => {
       entity.effects.add(EffectEnum.WHIPPED_DREAM)
     }),
@@ -399,46 +328,46 @@ export const DishEffects: Record<(typeof Dishes)[number], Effect[]> = {
       }
     })
   ],
-  SWEETS: [],
-  STRAWBERRY_SWEET: [
+  [Item.SWEETS]: [],
+  [Item.STRAWBERRY_SWEET]: [
     new OnDishConsumedEffect(({ pokemon, entity, player }) => {
       entity?.addAttack(3, entity, 0, false, true)
     })
   ],
-  LOVE_SWEET: [
+  [Item.LOVE_SWEET]: [
     new OnDishConsumedEffect(({ pokemon, entity, player }) => {
       entity?.addDefense(3, entity, 0, false, true)
     })
   ],
-  BERRY_SWEET: [
+  [Item.BERRY_SWEET]: [
     new OnDishConsumedEffect(({ pokemon, entity, player }) => {
       entity?.addMaxHP(15, entity, 0, false, true)
     })
   ],
-  CLOVER_SWEET: [
+  [Item.CLOVER_SWEET]: [
     new OnDishConsumedEffect(({ pokemon, entity, player }) => {
       entity?.addLuck(10, entity, 0, false, true)
     })
   ],
-  FLOWER_SWEET: [
+  [Item.FLOWER_SWEET]: [
     new OnDishConsumedEffect(({ pokemon, entity, player }) => {
-      entity?.addSpeed(5, entity, 0, false, true)
+      entity?.addSpeed(10, entity, 0, false, true)
     })
   ],
-  STAR_SWEET: [
+  [Item.STAR_SWEET]: [
     new OnDishConsumedEffect(({ pokemon, entity, player }) => {
       entity?.addAbilityPower(10, entity, 0, false, true)
     })
   ],
-  RIBBON_SWEET: [
+  [Item.RIBBON_SWEET]: [
     new OnDishConsumedEffect(({ pokemon, entity, player }) => {
       entity?.addSpecialDefense(3, entity, 0, false, true)
     })
   ],
-  RICE: [
+  [Item.RICE]: [
     new OnDishConsumedEffect(({ pokemon, entity, player }) => {
-      entity?.addShield(50, entity, 0, false)
-      if(!player) return
+      entity?.addShield(80, entity, 0, false)
+      if (!player) return
       const tatsugiriOnBoard = schemaValues(player.board).find(
         (e) => e && getBaseAltForm(e.name) === Pkm.TATSUGIRI_CURLY
       )
